@@ -1,0 +1,431 @@
+* {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: normal;
+  font-size: 15pt;
+  min-height: 100vh;
+  background: #dee1e2;
+}
+
+header {
+  overflow: hidden;
+  position: fixed;
+  background: white;
+  height: 74px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+  text-decoration: none;
+  color: darkred;
+  padding: 20px;
+  font-weight: 800;
+  font-size: 1.3em;
+  transition: 1s;
+  cursor: none;
+}
+
+.logo:hover {
+  color: red;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+}
+
+header ul {
+  position: relative;
+  display: flex;
+  padding: 12px;
+  gap: 10px;
+}
+
+header ul li {
+  list-style-type: none;
+
+}
+
+header ul li .a {
+  position: relative;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.2em;
+  color: black;
+  font-weight: 500;
+  cursor: none;
+}
+
+header ul li .a::before {
+  content: '';
+  position: absolute;
+  background: black;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+
+header ul li .a:hover::before {
+  transform: scaleX(1);
+}
+
+.style {
+  position: absolute;
+  top: 0%;
+  width: 500px ;
+  height: 30px;
+  background: dodgerblue;
+  border-radius: 0 100%;
+  opacity: 40%;
+}
+
+img {
+  width: 100%;
+}
+/** about section in any page**/
+
+.about {
+ display: flex ;
+ justify-content: center ;
+ align-items: center ;
+  border-radius: 30px;
+  width: 100%;
+  height: 750px;
+}
+
+.about .blur {
+  position: fixed ;
+  background: rgba(255, 255, 255, 0.5);
+  display: none ;
+  justify-content: center ;
+  overflow: hidden ;
+  backdrop-filter: blur(5px);
+  width: 330px;
+  height: 450px;
+  border-radius: 30px;
+  border: 1px solid red;
+}
+.blur .aslogo{
+  position: absolute ;
+  left: 30%;
+  width: 130px;
+  height: 130px;
+}
+.blur p{
+  position: absolute ;
+  top: 30%;
+  left: 6%;
+  text-align: left ;
+  font-weight: 300;
+  font-size: 0.9em;
+}
+.blur h4 {
+  position: absolute;
+  top: 54%;
+  left: 30%;
+  text-align: left;
+  font-size: 1em ;
+  font-weight: 400;
+}
+.blur .social{
+    position: absolute;
+    top: 62%;
+    left: 18%
+}
+.blur .social a{
+  text-decoration: none ;
+  display: flex ;
+  flex-direction: column ;
+  color: darkred;
+  padding: 3px ;
+  left: 18%;
+  font-weight: 350;
+  letter-spacing: 0.1em ;
+  font-size: 0.9em;
+
+}
+.blur h3{
+position: absolute;
+  top: 87%;
+  left: 34%;
+  font-weight: 400;
+  font-size: 0.7em;
+  border-bottom: 1px solid black;
+  
+}
+/** last of about**/
+
+
+.container .drum {
+  overflow: hidden ;
+  position: absolute;
+  top: 8%;
+  background: white;
+  width: 100%;
+  height: 350px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.drum .download-drum{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-drum h3 {
+  color: black;
+  font-size: 1em ;
+}
+.download-drum a{
+  text-decoration: none ;
+  color: 5E00A5;
+  
+}
+
+.drum-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.drum-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: black ;
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+
+.drum-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: black;
+  font-size: 1em;
+  
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+
+
+
+.container .dwp {
+  overflow: hidden ;
+  position: absolute;
+  top: 39%;
+  background: white;
+  width: 100%;
+  height: 350px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.dwp .download-dwp{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-dwp h3 {
+  color: black;
+  font-size: 1em ;
+}
+.download-dwp a{
+  text-decoration: none ;
+  color: 5E00A5;
+  
+}
+
+.dwp-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.dwp-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: black ;
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+
+.dwp-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: black;
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+
+.container .video {
+  overflow: hidden ;
+  position: absolute;
+  top: 70%;
+  background: white;
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.video .download-video{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-video h3 {
+  color: black;
+  font-size: 1em ;
+}
+.download-video a{
+  text-decoration: none ;
+  color: 5E00A5;
+  
+}
+
+.video-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.video-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: black ;
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+
+.video-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: black;
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: black;
+  font-weight: 300;
+}
+.conclusion {
+  display: flex;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+  background: white;
+  width: 100%;
+  height: 60px;
+  top: 96%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid black;
+}
+.container {
+  position: absolute ;
+  background: #dee1e2;
+  width: 100%;
+  height: 1230px ;
+}
+.blur .h1{
+  position: absolute ;
+  width: 100%;
+}
+.blur .h1 h1{
+  position: absolute;
+  left: 85%;
+  font-size: 3.3em ;
+  font-weight: 200;
+}

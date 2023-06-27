@@ -1,0 +1,243 @@
+* {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: normal;
+  font-size: 15pt;
+  background: #dee1e2;
+}
+
+header {
+  overflow: hidden;
+  position: fixed;
+  background: white;
+  height: 74px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+  text-decoration: none;
+  color: darkred;
+  padding: 20px;
+  font-weight: 800;
+  font-size: 1.3em;
+  transition: 1s;
+  cursor: none;
+}
+
+.logo:hover {
+  color: red;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+}
+
+header ul {
+  position: relative;
+  display: flex;
+  padding: 12px;
+  gap: 10px;
+}
+
+header ul li {
+  list-style-type: none;
+
+}
+
+header ul li .a {
+  position: relative;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.2em;
+  color: black;
+  font-weight: 500;
+  cursor: none;
+}
+
+header ul li .a::before {
+  content: '';
+  position: absolute;
+  background: black;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+
+header ul li .a:hover::before {
+  transform: scaleX(1);
+}
+.style {
+  position: absolute;
+  top: 0%;
+  width: 500px;
+  height: 30px;
+  background: dodgerblue;
+  border-radius: 0 100%;
+  opacity: 40%;
+}
+
+/** about section in any page**/
+
+.about {
+ display: flex ;
+ justify-content: center ;
+ align-items: center ;
+  border-radius: 30px;
+  width: 100%;
+  height: 750px;
+}
+
+.about .blur {
+  position: fixed ;
+  background: rgba(255, 255, 255, 0.5);
+  display: none ;
+  justify-content: center ;
+  overflow: hidden ;
+  backdrop-filter: blur(5px);
+  width: 330px;
+  height: 450px;
+  border-radius: 30px;
+  border: 1px solid red;
+}
+.blur .aslogo{
+  position: absolute ;
+  left: 30%;
+  width: 130px;
+  height: 130px;
+}
+.blur p{
+  position: absolute ;
+  top: 30%;
+  left: 6%;
+  text-align: left ;
+  font-weight: 300;
+  font-size: 0.9em;
+}
+.blur h4 {
+  position: absolute;
+  top: 54%;
+  left: 30%;
+  text-align: left;
+  font-size: 1em ;
+  font-weight: 400;
+}
+.blur .social{
+    position: absolute;
+    top: 62%;
+    left: 18%
+}
+.blur .social a{
+  text-decoration: none ;
+  display: flex ;
+  flex-direction: column ;
+  color: darkred;
+  padding: 3px ;
+  left: 18%;
+  font-weight: 350;
+  letter-spacing: 0.1em ;
+  font-size: 0.9em;
+
+}
+.blur h3{
+position: absolute;
+  top: 87%;
+  left: 34%;
+  font-weight: 400;
+  font-size: 0.7em;
+  border-bottom: 1px solid black;
+  
+}
+.blur.h1{
+  position: fixed;
+  width: 100%;
+}
+.blur .h1 h1{
+  position: absolute;
+  left: 85%;
+  font-size: 3.3em ;
+  font-weight: 200;
+}
+/** last of about**/
+
+.policy-container{
+  background: #dee1e2;
+  width: 100%;
+  height: 100%;
+  position: absolute ;
+}
+.conclusion {
+  display: flex;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+  background: white;
+  width: 100%;
+  height: 60px;
+  top: 100%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid black;
+}
+
+.po-do {
+  position: absolute ;
+  top: 15%;
+  display: flex ;
+  flex-direction: column ;
+  gap: 20px ;
+}
+.po-do ul{
+  display: flex;
+  flex-direction: column;
+  gap: 10px ;
+  }
+
+.po-do ul ol{
+
+}
+
+.po-do ul ol li{
+  color: black;
+  font-family:'Courier New', Courier, monospace;
+  font-size: 1.2em ;
+  text-align: center ;
+  list-style-type: none;
+}
+.po-do ul .text li{
+  font-size: 0.8em ;
+  font-family: monospace;
+  letter-spacing: 1px;
+  font-weight: 10;
+  padding-left: 40px ;
+}
+.contact {
+  position: absolute ;
+  top: 60%;
+  padding-left: 30px;
+  display: flex ;
+  flex-direction: column ;
+  gap: 3px;
+}
+.contact h1{
+  font-size: 0.8em ;
+  font-weight: 300;
+}
+.contact h3{
+  font-size: 0.7em;
+  letter-spacing: 3px;
+}

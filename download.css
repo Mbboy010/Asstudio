@@ -1,0 +1,510 @@
+* {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  font-family: normal;
+  font-size: 15pt;
+  background: #dee1e2;
+}
+
+header {
+  overflow: hidden;
+  position: fixed;
+  background: white;
+  height: 74px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+  text-decoration: none;
+  color: darkred;
+  padding: 20px;
+  font-weight: 800;
+  font-size: 1.3em;
+  transition: 1s;
+  cursor: none;
+}
+
+.logo:hover {
+  color: red;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+}
+
+header ul {
+  position: relative;
+  display: flex;
+  padding: 12px;
+  gap: 10px;
+}
+
+header ul li {
+  list-style-type: none;
+
+}
+
+header ul li .a {
+  position: relative;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.2em;
+  color: black;
+  font-weight: 500;
+  cursor: none;
+}
+
+header ul li .a::before {
+  content: '';
+  position: absolute;
+  background: black;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+
+header ul li .a:hover::before {
+  transform: scaleX(1);
+}
+.style {
+  position: absolute;
+  top: 0%;
+  width: 500px;
+  height: 30px;
+  background: dodgerblue;
+  border-radius: 0 100%;
+  opacity: 40%;
+}
+
+/** about section in any page**/
+
+.about {
+ display: flex ;
+ justify-content: center ;
+ align-items: center ;
+  border-radius: 30px;
+  width: 100%;
+  height: 750px;
+}
+
+.about .blur {
+  position: fixed ;
+  background: rgba(255, 255, 255, 0.5);
+  display: none ;
+  justify-content: center ;
+  overflow: hidden ;
+  backdrop-filter: blur(5px);
+  width: 330px;
+  height: 450px;
+  border-radius: 30px;
+  border: 1px solid red;
+}
+.blur .aslogo{
+  position: absolute ;
+  left: 30%;
+  width: 130px;
+  height: 130px;
+}
+.blur p{
+  position: absolute ;
+  top: 30%;
+  left: 6%;
+  text-align: left ;
+  font-weight: 300;
+  font-size: 0.9em;
+}
+.blur h4 {
+  position: absolute;
+  top: 54%;
+  left: 30%;
+  text-align: left;
+  font-size: 1em ;
+  font-weight: 400;
+}
+.blur .social{
+    position: absolute;
+    top: 62%;
+    left: 18%
+}
+.blur .social a{
+  text-decoration: none ;
+  display: flex ;
+  flex-direction: column ;
+  color: darkred;
+  padding: 3px ;
+  left: 18%;
+  font-weight: 350;
+  letter-spacing: 0.1em ;
+  font-size: 0.9em;
+
+}
+.blur h3{
+position: absolute;
+  top: 87%;
+  left: 34%;
+  font-weight: 400;
+  font-size: 0.7em;
+  border-bottom: 1px solid black;
+  
+}
+/** last of about**/
+
+.download-container{
+  background: #dee1e2;
+  width: 100%;
+  height: 740px;
+  position: absolute ;
+}
+
+/**download **/
+
+.download-container .download-sample{
+  background: white;
+  width: 100%;
+  height: 100px;
+  position: absolute ;
+  top: 16%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.download-container .download-sample h3{
+  font-weight: 300;
+  font-size: 1em ;
+  
+}
+.download-sample .section {
+  width: 100%;
+  position: absolute ;
+  height: 60px;
+  
+}
+.download-sample .section .free a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center ;
+  top: 19%;
+  left: 0%;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-sample .section .free a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-sample .section .free a:hover::before {
+  transform: scaleX(1);
+}
+.download-sample .section .pay a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center;
+  top: 64%;
+  left: 0%;
+  text-align: center ;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-sample .section .pay a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-sample .section .pay a:hover::before {
+  transform: scaleX(1);
+}
+/** end down**/
+
+/**download **/
+
+.download-container .download-dwp{
+  background: white;
+  width: 100%;
+  height: 100px;
+  position: absolute ;
+  top: 33%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.download-container .download-dwp h3{
+  font-weight: 300;
+  font-size: 1em ;
+  
+}
+.download-dwp .section {
+  width: 100%;
+  position: absolute ;
+  height: 60px;
+  
+}
+.download-dwp .section .free a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center ;
+  top: 19%;
+  left: 0%;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-dwp .section .free a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-dwp .section .free a:hover::before {
+  transform: scaleX(1);
+}
+.download-dwp .section .pay a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center;
+  top: 64%;
+  left: 0%;
+  text-align: center ;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-dwp .section .pay a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-dwp .section .pay a:hover::before {
+  transform: scaleX(1);
+}
+/** end down**/
+
+/**download **/
+
+.download-container .download-vid{
+  background: white;
+  width: 100%;
+  height: 100px;
+  position: absolute ;
+  top: 50%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.download-container .download-vid h3{
+  font-weight: 300;
+  font-size: 1em ;
+  
+}
+.download-vid .section {
+  width: 100%;
+  position: absolute ;
+  height: 60px;
+  
+}
+.download-vid .section .free a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center ;
+  top: 19%;
+  left: 0%;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-vid .section .free a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-vid .section .free a:hover::before {
+  transform: scaleX(1);
+}
+.download-vid .section .pay a{
+  text-decoration: none ;
+  position: absolute ;
+  width: 100%;
+  text-align: center;
+  top: 64%;
+  left: 0%;
+  text-align: center ;
+  color: black ;
+  font-weight: 400;
+  font-size: 1em ;
+}
+.download-vid .section .pay a::before{
+  content: '';
+  background: black;
+  position: absolute;
+  top: 90%;
+  left: 0%;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transition: 0.5s;
+}
+.download-vid .section .pay a:hover::before {
+  transform: scaleX(1);
+}
+/** end down**/
+
+.down-section{
+  display: none ;
+  background: white;
+  width: 100%;
+  height: 500px;
+  position: fixed ;
+  border: 1px solid darkred;
+  top: 30%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1),0 -2px 5px rgba(0, 0, 0, 0.1);
+  overflow-y: auto ;
+}
+.down-section .cancel {
+  position: fixed ;
+  width: 100%;
+  text-align: right;
+}
+.cancel h1{
+  padding: 2px ;
+  padding-right: 20px;
+  padding-top: 0px;
+  font-size: 3.6em ;
+  font-weight: 200;
+}
+.cancel h1 a{
+  text-decoration: none ;
+  color: black ;
+  cursor: none;
+}
+.down-section .down-cont{
+  margin-top: 20px ;
+  width: 100% ;
+  height: 60px ;
+  min-height: 500px;
+  
+}
+
+.down-list{
+  background: #dee1e2;
+  width: 100% ;
+  display: flex ;
+  align-items: center ;
+  border-radius: 30px;
+  border-bottom: 1px solid black ;
+  overflow: hidden ;
+}
+.down-list a{
+  text-decoration: none;
+  width: 100% ;
+  display: flex ;
+  align-items: center ;
+  cursor: pointer ;
+}
+.down-list .image{
+  padding: 1px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.down-list .image img{
+  width: 60px ;
+}
+.down-li .text{
+  display: flex ;
+}
+.down-list .text h1{
+  font-size: 1.3em ;
+  font-weight: 400;
+  color: black ;
+}
+.down-list .text h3 {
+  font-size: 1em;
+  font-weight: 300;
+  color: rebeccapurple
+}
+.blur.h1{
+  position: fixed;
+  width: 100%;
+}
+.blur .h1 h1{
+  position: absolute;
+  left: 85%;
+  font-size: 3.3em ;
+  font-weight: 200;
+}
+.conclusion {
+  display: flex;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+  background: white;
+  width: 100%;
+  height: 60px;
+  top: 140%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid black;
+}
+.down-cont h2{
+  font-size: 1em ;
+  position: fixed ;
+  width: 200px;
+  top: 31%;
+  padding: 20px ;
+  color: black;
+}
