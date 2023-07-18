@@ -1,7 +1,12 @@
-* {
-  padding: 0;
-  margin: 0;
+body {
+  font-family: normal;
+  font-size: 15pt;
+  background-repeat: no-repeat;
+  position: relative;
+  background: var(--background-colord);
+
 }
+
 
 
 .download-container .down-section {
@@ -129,7 +134,9 @@ height: 40px;
 body {
   font-family: normal;
   font-size: 9pt;
-  background: var( --listback);
+  background-repeat: no-repeat;
+  min-height: 100vh;
+
 }
 
 
