@@ -1,6 +1,10 @@
-* {
-  padding: 0;
-  margin: 0;
+body {
+  font-family: normal;
+  font-size: 15pt;
+  background-repeat: no-repeat;
+  position: relative;
+  background: var(--background-colord);
+
 }
 
 
@@ -94,10 +98,13 @@
 
 
 @media only screen and (max-width: 600px){
+  
 body {
   font-family: normal;
   font-size: 9pt;
-  background: var(--policy);
+  background-repeat: no-repeat;
+  min-height: 100vh;
+
 }
 
 .policy-container{
