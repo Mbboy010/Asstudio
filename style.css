@@ -291,8 +291,9 @@
   body {
   font-family: normal;
   font-size: 9pt;
+  background-repeat: no-repeat;
   min-height: 100vh;
-  background-repeat: no-repeat ;
+
 }
 
 
