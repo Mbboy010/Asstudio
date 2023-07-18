@@ -332,6 +332,7 @@ position: absolute;
 @media only screen and (max-width: 600px){
   body {
   font-family: normal;
+background-repeat: no-repeat ;
   font-size: 9pt;
   min-height: 100vh;
   background: var(--background-color);
