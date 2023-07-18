@@ -4,7 +4,14 @@
 }
 
 
+body {
+  font-family: normal;
+  font-size: 15pt;
+  background-repeat: no-repeat;
+  position: relative;
+  background: var(--background-colord);
 
+}
 
 
 
@@ -501,7 +508,9 @@ justify-content: center ;
 body {
   font-family: normal;
   font-size: 9pt;
-  background: var(--background-color);
+  background-repeat: no-repeat;
+  min-height: 100vh;
+
 }
 
 .download-container{
