@@ -1,0 +1,253 @@
+* {
+  padding: 0;
+  margin: 0;
+}
+
+
+.download-container .down-section {
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 648px;
+  height: 600px ;
+  position: absolute ;
+  top: 20%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+  
+}
+
+.conclusion {
+  display: none;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+ background: var(--background-image);
+ backdrop-filter: blur(5px);
+  width: 100%;
+  height: 60px;
+  top: 140%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  color: var(--header);
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid var(--header);;
+}
+.down-section .image {
+  width: 100%;
+  height: 250px ;
+  display: flex ;
+  align-items: center ;
+  justify-content: center;
+}
+.down-section .image img{
+  width: 200px ;
+}
+.down-section h1{
+  color: var(--header);
+  width: 100%;
+  text-align: center ;
+  font-size: 2.1em;
+  font-weight: 400;
+}
+.down-section .text{
+  height:150px ;
+  width: 100%;
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  gap: 4px ;
+
+
+}
+.down-section .text li{
+  list-style-type: none ;
+  margin-left: 40px ;
+  font-size: 1em ;
+  font-weight: 500;
+  letter-spacing: 3px;
+  color: var(--header);
+}
+.text li span{
+  font-weight: 300;
+  
+}
+.down-icon{
+  position: absolute ;
+  top: 76%;
+  width: 100%;
+  height: 70px ;
+  display: flex ;
+  justify-content: center ;
+  align-items: center ;
+  overflow: hidden ;
+}
+.down-icon .a{
+  background: var(--list-select);
+  width: 200px;
+  height: 50px;
+  border-radius: 30px ;
+  overflow: hidden ;
+}
+.down-icon .a a {
+  text-decoration: none;
+  color: var(--header);
+  width: 200px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4em;
+  border-radius: 30px;
+}
+.aut{
+  width: 100%;
+  display: flex ;
+  justify-content: center ;
+  position: absolute ;
+  top: 64%;
+  
+}
+audio {
+width: 300px;
+height: 40px;
+}
+
+.text ul{
+  position: absolute;
+  top: 50%;
+}
+
+
+
+
+
+@media only screen and (max-width: 600px){
+
+body {
+  font-family: normal;
+  font-size: 9pt;
+  background: var( --listback);
+}
+
+
+  
+.download-container .down-section {
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100% ;
+  height: 600px ;
+  position: absolute ;
+  top: 20%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+  
+}
+.conclusion {
+  display: flex;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+ background: var(--background-image);
+ backdrop-filter: blur(5px);
+  width: 100%;
+  height: 60px;
+  top: 140%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  color: var(--header);
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid var(--header);;
+}
+.down-section .image {
+  width: 100%;
+  height: 250px ;
+  display: flex ;
+  align-items: center ;
+  justify-content: center;
+}
+.down-section .image img{
+  width: 200px ;
+}
+.down-section h1{
+  color: var(--header);
+  width: 100%;
+  text-align: center ;
+  font-size: 2.1em;
+  font-weight: 400;
+}
+.down-section .text{
+  height:150px ;
+  width: 100%;
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  gap: 4px ;
+
+
+}
+.down-section .text li{
+  list-style-type: none ;
+  margin-left: 40px ;
+  font-size: 1em ;
+  font-weight: 500;
+  letter-spacing: 3px;
+  color: var(--header);
+}
+.text li span{
+  font-weight: 300;
+  
+}
+.down-icon{
+  position: absolute ;
+  top: 76%;
+  width: 100%;
+  height: 70px ;
+  display: flex ;
+  justify-content: center ;
+  align-items: center ;
+  overflow: hidden ;
+}
+.down-icon .a{
+  background: var(--list-select);
+  width: 200px;
+  height: 50px;
+  border-radius: 30px ;
+  overflow: hidden ;
+}
+.down-icon .a a {
+  text-decoration: none;
+  color: var(--header);
+  width: 200px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4em;
+  border-radius: 30px;
+}
+.aut{
+  width: 100%;
+  display: flex ;
+  justify-content: center ;
+  position: absolute ;
+  top: 64%;
+  
+}
+audio {
+width: 300px;
+height: 40px;
+}
+
+.text ul{
+  position: absolute;
+  top: 50%;
+}
+
+
+}

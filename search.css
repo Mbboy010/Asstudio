@@ -1,0 +1,168 @@
+*{
+  padding: 0;
+  margin: 0;
+}
+
+.search-cont{
+  display: none ;
+  position: fixed ;
+  justify-content: center ;
+  top: 6%;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 9px 9px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+  background: var(--about);
+  width: 648px;
+  height: 500px ;
+  
+}
+.search-just{
+  width: 648px;
+  height: 500px;
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+  overflow: hidden ;
+  
+}
+.search-cont h1{
+  
+  background: var(--header);
+  position: absolute ;
+  color: var(--header1);
+  width: 600px;
+  font-size: 1.5em ;
+  top: 0%;
+  padding-left: 50px ;
+  height: 30px;
+  display: flex ;
+  align-items: center ;
+  
+}
+.search-cont .bar {
+  height: 400px ;
+  width: 400px ;
+  position: absolute ;
+  top: 6%;
+  overflow-y: auto ;
+}
+.search-cont .search-sect{
+  display: none ;
+  flex-direction: column ;
+  gap: 5px ;
+  
+  
+}
+
+.search-cont #myTable {
+  border-collapse: collapse;
+  width: 100%;
+
+}
+
+#myTable td {
+  text-align: left;
+  padding: 5px;
+}
+
+#myTable tr {
+}
+
+#myTable tr a {
+  text-decoration: none;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--header);
+}
+
+#myTable tr a li {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  list-style-type: none;
+  padding-left: 20px;
+}
+
+@media only screen and (max-width: 600px) {
+  .search-cont{
+  display: none ;
+  position: fixed ;
+  justify-content: center ;
+  top: 12%;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 9px 9px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+  background: var(--about);
+  width: 100%;
+  height: 700px ;
+  
+}
+.search-just{
+  width: 100%;
+  height: 500px;
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+  overflow: hidden ;
+  
+}
+.search-cont h1{
+  
+  background: var(--header);
+  position: absolute ;
+  color: var(--header1);
+  width: 100%;
+  font-size: 1.5em ;
+  top: 0%;
+  padding-left: 50px ;
+  height: 30px;
+  display: flex ;
+  align-items: center ;
+  
+}
+.search-cont .bar {
+  height: 400px ;
+  width: 400px ;
+  position: absolute ;
+  top: 6%;
+  overflow-y: auto ;
+}
+.search-cont .search-sect{
+  display: none ;
+  flex-direction: column ;
+  gap: 5px ;
+  
+  
+}
+
+.search-cont #myTable {
+  border-collapse: collapse;
+  width: 100%;
+
+}
+
+#myTable td {
+  text-align: left;
+  padding: 5px;
+}
+
+#myTable tr {
+}
+
+#myTable tr a {
+  text-decoration: none;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--header);
+}
+
+#myTable tr a li {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  list-style-type: none;
+  padding-left: 20px;
+}
+
+  
+}

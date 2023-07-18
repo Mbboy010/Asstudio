@@ -1,0 +1,584 @@
+
+.container img{
+  position: relative;
+  width: px;
+}
+
+.container {
+  padding-top: 100px;
+  backdrop-filter: blur(90px);
+  position: absolute;
+  display: flex;
+  width: 648px;
+  height: 1300px;
+}
+
+.container .drum {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 7%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.drum .download-drum{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-drum h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-drum a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.drum-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.drum-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.drum-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.container .dwp {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 30%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.dwp .download-dwp{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-dwp h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-dwp a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.dwp-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.dwp-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.dwp-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.container .video {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 77%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.video .download-video{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-video h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-video a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.video-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.video-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.video-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.container .music{
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 53%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.music .download-dwp{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+
+.conclusion {
+  display: none;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 60px;
+  top: 96%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+
+
+
+
+/** mobile mode**/
+
+@media only screen and (max-width: 600px) {
+  
+  body {
+  font-family: normal;
+  font-size: 9pt;
+  min-height: 100vh;
+  background: var(--background-color);
+}
+
+
+.container .drum {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 6%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 350px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.drum .download-drum{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-drum h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-drum a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.drum-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.drum-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.drum-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+
+
+.container .dwp {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 29%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 350px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.dwp .download-dwp{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-dwp h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-dwp a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.dwp-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.dwp-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.dwp-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.container .video {
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 75%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 300px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.video .download-video{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+.download-video h3 {
+  color: var(--header);
+  font-size: 1em ;
+}
+.download-video a{
+  text-decoration: none ;
+  color: var(--fo);
+  
+}
+
+.video-cont{
+  display: flex ;
+  justify-content: center ;
+  gap: 70px ;
+}
+.video-cont .premier {
+  display: flex ;
+  flex-direction: column ;
+  justify-content: center ;
+  align-items: center ;
+}
+.premier img{
+  width: 150px ;
+}
+.premier a{
+  text-decoration: none ;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+  
+}
+.premier span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+
+.video-cont .hausa {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.hausa img{
+  width: 150px ;
+}
+.hausa a {
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--header);
+  font-size: 1em;
+
+}
+
+.hausa span {
+  font-size: 0.7em;
+  color: var(--header);
+  font-weight: 300;
+}
+.conclusion {
+  display: flex;
+  justify-content: center ;
+  align-items: center ;
+  position: absolute ;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 60px;
+  top: 96%;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.conclusion h4 {
+  color: var(--header);
+  font-weight: 400;
+  font-size: 0.7em ;
+  border-bottom: 1px solid var(--header);;
+}
+.container {
+  display: block ;
+  backdrop-filter: blur(90px);
+  position: absolute ;
+  background: var(--background-color);
+  width: 100%;
+  height: 1630px ;
+}
+
+
+.container .music{
+  backdrop-filter: blur(5px);
+  overflow: hidden ;
+  position: absolute;
+  top: 52%;
+  background: var(--background-image);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  height: 350px ;
+  border-radius: 0px 20px 0px 0px ;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.1),0 -5px 5px rgba(0, 0, 0, 0.1);
+}
+.music .download-dwp{
+  display: flex ;
+  justify-content: space-between;
+  padding: 20px ;
+
+}
+
+
+}
