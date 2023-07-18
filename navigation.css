@@ -2,14 +2,7 @@
   padding: 0;
   margin: 0;
 }
-body{
-  font-family: normal;
-  font-size: 15pt;
-  background-repeat: no-repeat;
-  position: relative;
-  background: var(--background-colord);
-  
-}
+
 header{
     overflow: hidden;
   position: fixed;
