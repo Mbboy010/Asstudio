@@ -18,7 +18,7 @@ body:not(.dark-mode){
   --policy: url("wtf.png" ) ;
 }
 .dark-mode {
-  --background-color: black;
+  --background-color: linear-gradient(0deg,black,#66614A,#382835);
       --background-colord: url("backdd.png" );
   --color: white;
   --background-image: linear-gradient(40deg,rgba(76, 59, 103, 0.7),rgba(51, 82, 144, 0.7)) ;
