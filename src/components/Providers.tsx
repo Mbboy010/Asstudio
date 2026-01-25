@@ -8,12 +8,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/firebase';
 import { ThemeProvider } from 'next-themes';
 
-// Define the User interface to match your Redux slice
+// Updated: role must match the literal types expected by your Redux store
 interface AppUser {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: 'user' | 'admin'; // Changed from string to literal types
   avatar: string;
   joinedAt: string;
   emailVerified: boolean;
@@ -27,7 +27,6 @@ const AuthListener: React.FC<AuthListenerProps> = ({ children }) => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       dispatch(setLoading(true));
       if (firebaseUser) {
@@ -38,12 +37,13 @@ const AuthListener: React.FC<AuthListenerProps> = ({ children }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             
-            // Construct user object with explicit typing
+            // Construct user object with strict typing for 'role'
             const appUser: AppUser = {
               id: firebaseUser.uid,
               email: firebaseUser.email || userData.email,
               name: userData.name || firebaseUser.displayName || 'User',
-              role: isDevAdmin ? 'admin' : userData.role,
+              // Force the role to be either 'admin' or 'user'
+              role: (isDevAdmin ? 'admin' : (userData.role === 'admin' ? 'admin' : 'user')),
               avatar: userData.avatar || firebaseUser.photoURL || '',
               joinedAt: userData.joinedAt || new Date().toISOString(),
               emailVerified: firebaseUser.emailVerified
@@ -51,7 +51,6 @@ const AuthListener: React.FC<AuthListenerProps> = ({ children }) => {
 
             dispatch(setUser(appUser));
           } else {
-             // Fallback for new users or missing docs
              const fallbackUser: AppUser = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || '',
