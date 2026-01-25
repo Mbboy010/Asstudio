@@ -7,7 +7,7 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2
+  User, Shield, Trash2, LucideIcon // Added LucideIcon type
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
@@ -23,15 +23,16 @@ interface LibraryItem {
     category: string;
     size: string;
     orderDate: string;
-    productUrl?: string; // Optional real download link
+    productUrl?: string;
 }
 
+// Fixed the "any" type here
 interface OrderItem {
     id: string;
     createdAt: string;
     status: string;
     total: number;
-    items: any[];
+    items: LibraryItem[]; 
 }
 
 const UserDashboardContent: React.FC = () => {
@@ -40,15 +41,12 @@ const UserDashboardContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('My Library');
   const [isSaving, setIsSaving] = useState(false);
   
-  // Real-time Orders & Library State
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   
-  // Form State
   const [displayName, setDisplayName] = useState(user?.name || '');
 
-  // Image Upload & Crop State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [cropImgSrc, setCropImgSrc] = useState<string | null>(null);
@@ -64,7 +62,6 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
-  // Fetch Orders Real-time
   useEffect(() => {
     if (!user) return;
     setLoadingOrders(true);
@@ -82,7 +79,7 @@ const UserDashboardContent: React.FC = () => {
                     total: data.total,
                     items: data.items || [] 
                 };
-            });
+            }) as OrderItem[]; // Cast to OrderItem
             
             fetchedOrders.sort((a, b) => {
                 const dateA = new Date(a.createdAt || 0).getTime();
@@ -97,7 +94,7 @@ const UserDashboardContent: React.FC = () => {
             
             fetchedOrders.forEach((order) => {
                 if (order.status === 'Completed' && Array.isArray(order.items)) {
-                    order.items.forEach((item: any) => {
+                    order.items.forEach((item: LibraryItem) => { // Specified type
                         const itemId = item.id || `item-${Math.random()}`; 
                         if (!seenIds.has(itemId)) {
                             seenIds.add(itemId);
@@ -136,7 +133,6 @@ const UserDashboardContent: React.FC = () => {
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  // --- Image Handling Logic ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
@@ -253,7 +249,6 @@ const UserDashboardContent: React.FC = () => {
       if (item.productUrl) {
           window.open(item.productUrl, '_blank');
       } else {
-          // Fallback if no direct link
           const element = document.createElement("a");
           const fileContent = `Thank you for downloading ${item.name} from A.S Studio!\n\nProduct: ${item.name}\nLicense: Royalty-Free\n\nDownload ID: ${item.id}`;
           const file = new Blob([fileContent], {type: 'text/plain'});
@@ -287,14 +282,12 @@ const UserDashboardContent: React.FC = () => {
           viewport={{ once: false }}
           className="relative mb-12 rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm"
         >
-          {/* Cover Banner */}
           <div className="h-48 bg-gradient-to-r from-rose-900 via-black to-black relative">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
               <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-t from-black/80 to-transparent"></div>
           </div>
           
           <div className="px-6 pb-8 flex flex-col items-center -mt-20 gap-6 relative z-10">
-              {/* Avatar */}
               <div className="relative group">
                 <div className="w-40 h-40 rounded-full border-4 border-white dark:border-zinc-900 overflow-hidden bg-zinc-800 shadow-2xl relative z-10">
                     <img 
@@ -304,7 +297,6 @@ const UserDashboardContent: React.FC = () => {
                     />
                 </div>
                 
-                {/* Upload Button */}
                 <button 
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute bottom-2 right-2 bg-rose-600 text-white p-2.5 rounded-full border-4 border-white dark:border-zinc-900 z-20 hover:scale-110 transition-transform shadow-lg cursor-pointer"
@@ -320,7 +312,6 @@ const UserDashboardContent: React.FC = () => {
                 <p className="text-gray-500 font-medium">{user?.email}</p>
               </div>
 
-              {/* Stats */}
               <div className="flex gap-4 justify-center w-full max-w-lg mx-auto">
                 <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
                     <div className="font-black text-2xl text-gray-900 dark:text-white">{orders.length}</div>
@@ -334,10 +325,7 @@ const UserDashboardContent: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* --- Layout Grid --- */}
         <div className="flex flex-col lg:flex-row gap-8">
-          
-          {/* Sidebar Tabs */}
           <div className="w-full lg:w-72 flex-shrink-0">
             <nav className="space-y-2 sticky top-24">
               {tabs.map(item => (
@@ -357,7 +345,6 @@ const UserDashboardContent: React.FC = () => {
             </nav>
           </div>
 
-          {/* Main Content */}
           <div className="flex-1 min-h-[500px]">
             <AnimatePresence mode="wait">
               <motion.div
@@ -373,7 +360,6 @@ const UserDashboardContent: React.FC = () => {
                   {activeTab}
                 </h2>
                 
-                {/* 1. MY LIBRARY */}
                 {activeTab === 'My Library' && (
                   <div>
                       {loadingOrders ? (
@@ -408,7 +394,6 @@ const UserDashboardContent: React.FC = () => {
                   </div>
                 )}
 
-                {/* 2. HISTORY */}
                 {activeTab === 'History' && (
                     <div className="space-y-4">
                       {loadingOrders ? (
@@ -444,7 +429,6 @@ const UserDashboardContent: React.FC = () => {
                     </div>
                 )}
 
-                {/* 3. DOWNLOADS */}
                 {activeTab === 'Downloads' && (
                     <div>
                       {libraryItems.length > 0 ? (
@@ -473,10 +457,8 @@ const UserDashboardContent: React.FC = () => {
                     </div>
                 )}
 
-                {/* 4. FAVORITES */}
                 {activeTab === 'Favorites' && <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
 
-                {/* 5. SETTINGS */}
                 {activeTab === 'Settings' && (
                     <div className="max-w-2xl space-y-8">
                       <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -535,7 +517,6 @@ const UserDashboardContent: React.FC = () => {
         </div>
       </div>
 
-      {/* --- Crop Modal --- */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <motion.div 
@@ -552,7 +533,7 @@ const UserDashboardContent: React.FC = () => {
                 >
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white"><Upload className="w-5 h-5 text-rose-600" /> Adjust Image</h3>
-                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); fileInputRef.current!.value = ''; }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500">
+                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -601,7 +582,7 @@ const UserDashboardContent: React.FC = () => {
 
                         <div className="flex gap-3">
                             <button 
-                                onClick={() => { setIsCropOpen(false); setCropImgSrc(null); fileInputRef.current!.value = ''; }}
+                                onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                                 className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                             >
                                 Cancel
@@ -623,7 +604,14 @@ const UserDashboardContent: React.FC = () => {
   );
 };
 
-const EmptyState = ({ icon: Icon, text, actionText }: { icon: any, text: string, actionText?: string }) => (
+// Fixed the "any" type here
+interface EmptyStateProps {
+    icon: LucideIcon;
+    text: string;
+    actionText?: string;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, text, actionText }) => (
     <div className="text-center py-20 bg-gray-50 dark:bg-zinc-800/20 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-800">
         <div className="w-16 h-16 bg-gray-200 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <Icon className="w-8 h-8 text-gray-400 dark:text-zinc-600" />

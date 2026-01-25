@@ -13,9 +13,8 @@ var firebaseConfig = {
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
-// Initialize Firebase
-// This check prevents re-initialization during hot-reloads in Next.js
-var app = !(0, app_1.getApps)().length ? (0, app_1.initializeApp)(firebaseConfig) : (0, app_1.getApp)();
+// This check is essential for Next.js to prevent "Firebase App already exists" errors
+var app = (0, app_1.getApps)().length > 0 ? (0, app_1.getApp)() : (0, app_1.initializeApp)(firebaseConfig);
 exports.auth = (0, auth_1.getAuth)(app);
 exports.db = (0, firestore_1.getFirestore)(app);
 exports.storage = (0, storage_1.getStorage)(app);

@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { motion } from 'framer-motion';
-import { Search, ShoppingCart, Play, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter } from 'lucide-react';
+import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter } from 'lucide-react';
 import { Product, ProductCategory } from '@/types';
 import { ProductSkeleton } from '@/components/ui/Skeleton';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, setError, RootState } from '@/store';
 import Link from 'next/link';
+import Image from 'next/image'; // Added Next.js Image
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
@@ -38,21 +39,13 @@ const ShopContent: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   
   const [loading, setLoading] = useState(true);
-  
-  // URL Params State
   const selectedCategory = searchParams.get('category') || 'All';
   const urlSearchTerm = searchParams.get('search') || '';
-  
-  // Local state for input to allow typing without jitter
   const [localSearchTerm, setLocalSearchTerm] = useState(urlSearchTerm);
-
   const [products, setProducts] = useState<Product[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Restore search from cookie on mount
   useEffect(() => {
     const cookieSearch = getCookie('asstudio_search');
     const urlSearch = searchParams.get('search');
@@ -67,14 +60,12 @@ const ShopContent: React.FC = () => {
         params.set('search', cookieSearch);
         router.replace(`/shop?${params.toString()}`);
     }
-  }, []);
+  }, [router, searchParams]);
 
-  // Sync local state with URL param (handle browser back/forward)
   useEffect(() => {
     setLocalSearchTerm(urlSearchTerm);
   }, [urlSearchTerm]);
 
-  // Debounce URL update when typing & Save Cookie
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearchTerm !== urlSearchTerm) {
@@ -92,7 +83,8 @@ const ShopContent: React.FC = () => {
     return () => clearTimeout(timer);
   }, [localSearchTerm, searchParams, router, urlSearchTerm]);
 
-  const fetchProducts = async () => {
+  // Wrapped in useCallback to fix the missing dependency warning
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const q = query(collection(db, "products"), orderBy("uploadDate", "desc"));
@@ -102,19 +94,20 @@ const ShopContent: React.FC = () => {
         fetchedProducts.push({ id: doc.id, ...doc.data() } as Product);
       });
       setProducts(fetchedProducts);
-    } catch (error: any) {
-      console.error("Error fetching products: ", error);
-      if (error.code === 'permission-denied' || error.message.includes('disabled')) {
-         dispatch(setError("Failed to load products: Cloud Firestore API is not enabled for this project."));
+    } catch (error: unknown) { // Fixed "any"
+      const err = error as { code?: string; message?: string };
+      console.error("Error fetching products: ", err);
+      if (err.code === 'permission-denied' || err.message?.includes('disabled')) {
+         dispatch(setError("Failed to load products."));
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     fetchProducts();
-  }, [dispatch]);
+  }, [fetchProducts]);
 
   const checkAuthAndVerification = async () => {
     if (!user) {
@@ -131,12 +124,13 @@ const ShopContent: React.FC = () => {
         if (!currentUser.emailVerified) {
             try {
                 await sendEmailVerification(currentUser);
-                dispatch(setError(`Account not verified. A verification link has been sent to ${currentUser.email}. Please verify and try again.`));
-            } catch (error: any) {
-                 if (error.code === 'auth/too-many-requests') {
-                     dispatch(setError("Verification email already sent. Please check your inbox."));
+                dispatch(setError(`Account not verified. A link has been sent to ${currentUser.email}.`));
+            } catch (error: unknown) { // Fixed "any"
+                 const err = error as { code?: string; message?: string };
+                 if (err.code === 'auth/too-many-requests') {
+                     dispatch(setError("Verification email already sent. Check your inbox."));
                  } else {
-                     dispatch(setError(error.message));
+                     dispatch(setError(err.message || "Verification failed."));
                  }
             }
             return false;
@@ -172,7 +166,7 @@ const ShopContent: React.FC = () => {
         });
 
         const element = document.createElement("a");
-        const fileContent = `Thank you for downloading ${product.name} from A.S Studio!\n\nProduct: ${product.name}\nLicense: Royalty-Free\n\nDownload Link: https://asstudio.com/download/${product.id}`;
+        const fileContent = `Product: ${product.name}\nLicense: Royalty-Free`;
         const file = new Blob([fileContent], {type: 'text/plain'});
         element.href = URL.createObjectURL(file);
         element.download = `${product.name.replace(/\s+/g, '_')}_License.txt`;
@@ -228,7 +222,7 @@ const ShopContent: React.FC = () => {
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300">
       
-      {/* Header & Controls */}
+      {/* Header */}
       <motion.div 
          initial={{ opacity: 0, y: -20 }}
          whileInView={{ opacity: 1, y: 0 }}
@@ -236,23 +230,19 @@ const ShopContent: React.FC = () => {
          className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8 border-b border-gray-200 dark:border-zinc-800 pb-8"
       >
         <div>
-           <div className="flex items-center gap-2 mb-2">
-              <span className="text-rose-600 font-bold text-xs uppercase tracking-widest">Store Catalog</span>
-           </div>
-           <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-2">EXPLORE SOUNDS</h1>
-           <p className="text-gray-500 font-medium">Over {products.length}+ premium tools for your production.</p>
+           <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-2 uppercase">Explore Sounds</h1>
+           <p className="text-gray-500 font-medium">Over {products.length}+ premium tools available.</p>
         </div>
         
-        {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
            <div className="relative w-full sm:w-auto">
-             <Search className="absolute left-3 top-3.5 text-gray-400 w-5 h-5 group-focus-within:text-rose-600 transition-colors" />
+             <Search className="absolute left-3 top-3.5 text-gray-400 w-5 h-5 transition-colors" />
              <input 
                type="text" 
                placeholder="Search plugins, packs..." 
                value={localSearchTerm}
                onChange={(e) => setLocalSearchTerm(e.target.value)}
-               className="pl-10 pr-4 py-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl w-full sm:w-64 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition-all shadow-sm"
+               className="pl-10 pr-4 py-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl w-full sm:w-64 focus:ring-2 focus:ring-rose-500 outline-none transition-all shadow-sm"
              />
            </div>
            
@@ -263,8 +253,8 @@ const ShopContent: React.FC = () => {
                  onClick={() => handleCategoryChange(cat)}
                  className={`px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
                    selectedCategory === cat 
-                   ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20 scale-[1.02]' 
-                   : 'bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600 hover:text-gray-900 dark:hover:text-white'
+                   ? 'bg-rose-600 text-white shadow-lg' 
+                   : 'bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-zinc-800 hover:text-gray-900 dark:hover:text-white'
                  }`}
                >
                  {cat === ProductCategory.VST_PLUGIN && <Cpu className="w-4 h-4" />}
@@ -286,38 +276,38 @@ const ShopContent: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false }}
-              className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden group hover:shadow-xl hover:shadow-rose-600/5 transition-all duration-300 flex flex-col"
+              className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col"
             >
-              <Link 
-                href={`/product/${product.id}`} 
-                className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer"
-              >
+              <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
-                   <img src={product.image} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" />
+                   <Image 
+                    src={product.image} 
+                    alt={product.name} 
+                    fill 
+                    className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                   />
                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700 bg-gray-50 dark:bg-zinc-800">
+                   <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
                       <ImageIcon className="w-12 h-12 opacity-50" />
                    </div>
                 )}
                 
-                {/* Badges */}
-                <div className="absolute top-3 left-3 flex flex-col gap-2">
+                <div className="absolute top-3 left-3">
                     {product.category === ProductCategory.VST_PLUGIN && (
-                        <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded border border-white/10 uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                        <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded border border-white/10 uppercase tracking-wider flex items-center gap-1">
                             <Cpu className="w-3 h-3" /> VST
                         </div>
                     )}
                 </div>
                 
                 {product.price === 0 && (
-                     <div className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-rose-600/20">
+                     <div className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
                         Free
                     </div>
                 )}
 
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-[2px]">
-                   <div className="p-3 bg-white text-black rounded-full hover:scale-110 transition-transform shadow-xl">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                   <div className="p-3 bg-white text-black rounded-full shadow-xl">
                       <Eye className="w-5 h-5" />
                    </div>
                 </div>
@@ -327,15 +317,15 @@ const ShopContent: React.FC = () => {
                  <div className="flex justify-between items-start mb-3">
                    <div className="flex-1 pr-2 overflow-hidden">
                       <Link href={`/product/${product.id}`} className="hover:text-rose-600 transition-colors block">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight truncate">{product.name}</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate">{product.name}</h3>
                       </Link>
-                      <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mt-1">
-                         <span className="uppercase">{product.category}</span>
+                      <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mt-1 uppercase">
+                         {product.category}
                          <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-700"></span>
                          <span className="flex items-center gap-0.5 text-yellow-500"><Star className="w-3 h-3 fill-current" /> {product.rating}</span>
                       </div>
                    </div>
-                   <span className={`font-mono font-bold whitespace-nowrap text-lg ${product.price === 0 ? 'text-green-600 dark:text-green-500' : 'text-gray-900 dark:text-white'}`}>
+                   <span className="font-mono font-bold text-lg text-gray-900 dark:text-white">
                       {product.price === 0 ? 'FREE' : `₦${product.price}`}
                    </span>
                  </div>
@@ -345,7 +335,7 @@ const ShopContent: React.FC = () => {
                         <button 
                             onClick={() => handleDownload(product)}
                             disabled={downloadingId === product.id}
-                            className="w-full py-2.5 bg-gray-100 dark:bg-zinc-800 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white text-gray-900 dark:text-white transition-all rounded-lg font-bold flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                            className="w-full py-2.5 bg-gray-100 dark:bg-zinc-800 hover:bg-rose-600 hover:text-white transition-all rounded-lg font-bold flex items-center justify-center gap-2 text-sm"
                         >
                             {downloadingId === product.id ? <Loader className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4" />} Download
                         </button>
@@ -367,7 +357,7 @@ const ShopContent: React.FC = () => {
                 <Filter className="w-10 h-10 text-gray-400" />
              </div>
              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No products found</h2>
-             <p className="text-gray-500 mb-8">We couldn't find any items matching your filters.</p>
+             <p className="text-gray-500 mb-8">We couldn&apos;t find any items matching your filters.</p>
              <button onClick={handleResetFilters} className="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors">
                <RefreshCcw className="w-4 h-4" /> Clear Filters
              </button>
@@ -375,42 +365,39 @@ const ShopContent: React.FC = () => {
         )}
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-16 flex justify-center items-center gap-2">
             <button 
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-3 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-900 dark:text-white"
+                className="p-3 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
             >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 text-gray-900 dark:text-white" />
             </button>
 
             <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-1.5 shadow-sm">
-                {Array.from({ length: totalPages }).map((_, idx) => {
-                    const page = idx + 1;
-                    return (
-                        <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            className={`w-10 h-10 rounded-lg font-bold transition-all ${
-                                currentPage === page
-                                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
-                                : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'
-                            }`}
-                        >
-                            {page}
-                        </button>
-                    );
-                })}
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                    <button
+                        key={idx + 1}
+                        onClick={() => handlePageChange(idx + 1)}
+                        className={`w-10 h-10 rounded-lg font-bold transition-all ${
+                            currentPage === idx + 1
+                            ? 'bg-rose-600 text-white shadow-lg'
+                            : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                        }`}
+                    >
+                        {idx + 1}
+                    </button>
+                ))}
             </div>
 
             <button 
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-3 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-gray-900 dark:text-white"
+                className="p-3 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
             >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 text-gray-900 dark:text-white" />
             </button>
         </div>
       )}

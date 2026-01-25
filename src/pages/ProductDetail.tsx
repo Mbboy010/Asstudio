@@ -5,18 +5,40 @@ import { useParams, useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, addToCart, setError } from '@/store';
 import { 
-  Play, Pause, Download, ShoppingCart, Check, ArrowLeft, Calendar, 
+  Pause, Play, Download, ShoppingCart, Check, ArrowLeft, Calendar, 
   HardDrive, Star, MessageSquare, ThumbsUp, User, Trash2, Edit2, X, 
-  Save, Mail, ShieldCheck, Image as ImageIcon, Loader, Volume2, 
+  Save, Image as ImageIcon, Loader, Volume2, 
   VolumeX, Share2, Info 
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image'; // Added for performance
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DetailSkeleton } from '@/components/ui/Skeleton';
 import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { sendEmailVerification } from 'firebase/auth';
+
+// --- Interfaces ---
+
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+}
+
+interface Review {
+  id: string; 
+  userId: string;
+  user: string;
+  rating: number;
+  date: string;
+  content: string;
+  avatar: string;
+  likes: number;
+  isLiked?: boolean;
+}
 
 // --- Sub-components ---
 
@@ -33,21 +55,9 @@ const StarRating = ({ rating, size = "w-4 h-4" }: { rating: number, size?: strin
   );
 };
 
-interface Review {
-  id: string; 
-  userId: string;
-  user: string;
-  rating: number;
-  date: string;
-  content: string;
-  avatar: string;
-  likes: number;
-  isLiked?: boolean;
-}
-
 const ReviewItem: React.FC<{ 
     review: Review; 
-    currentUser: any; 
+    currentUser: AuthUser | null; // Fixed 'any'
     onLike: (id: string) => void; 
     onDelete: (id: string) => void; 
     onUpdate: (id: string, content: string) => void;
@@ -58,9 +68,9 @@ const ReviewItem: React.FC<{
 
     useEffect(() => {
         if (!review.userId) return;
-        const unsub = onSnapshot(doc(db, "users", review.userId), (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
+        const unsub = onSnapshot(doc(db, "users", review.userId), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
                 setUserData({
                     name: data.name || review.user,
                     avatar: data.avatar || review.avatar
@@ -79,7 +89,14 @@ const ReviewItem: React.FC<{
         <div className="bg-gray-50 dark:bg-zinc-900/50 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800 hover:border-rose-200 dark:hover:border-zinc-700 transition-colors">
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
-                    <img src={userData.avatar} alt={userData.name} className="w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-zinc-800" />
+                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-zinc-800">
+                        <Image 
+                          src={userData.avatar} 
+                          alt={userData.name} 
+                          fill 
+                          className="object-cover" 
+                        />
+                    </div>
                     <div>
                         <div className="font-bold text-sm text-gray-900 dark:text-white">{userData.name}</div>
                         <div className="flex items-center gap-2 mt-1">
@@ -99,8 +116,8 @@ const ReviewItem: React.FC<{
 
                     {currentUser && currentUser.id === review.userId && !isEditing && (
                         <div className="flex items-center gap-1 border-l border-gray-200 dark:border-zinc-700 pl-2">
-                            <button onClick={() => setIsEditing(true)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors"><Edit2 className="w-3 h-3" /></button>
-                            <button onClick={() => onDelete(review.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            <button onClick={() => setIsEditing(true)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors" title="Edit Review"><Edit2 className="w-3 h-3" /></button>
+                            <button onClick={() => onDelete(review.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete Review"><Trash2 className="w-3 h-3" /></button>
                         </div>
                     )}
                 </div>
@@ -115,7 +132,7 @@ const ReviewItem: React.FC<{
                     </div>
                 </div>
             ) : (
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm whitespace-pre-wrap">"{review.content}"</p>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm whitespace-pre-wrap">&quot;{review.content}&quot;</p>
             )}
         </div>
     );
@@ -127,12 +144,11 @@ const ProductDetailContent: React.FC = () => {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const { user } = useSelector((state: RootState) => state.auth) as { user: AuthUser | null };
   
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Reviews State
   const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState('');
   const [userRating, setUserRating] = useState(5);
@@ -140,14 +156,12 @@ const ProductDetailContent: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Audio Player State
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Fetch Product
   useEffect(() => {
     const fetchProduct = async () => {
         if (!id) return;
@@ -167,16 +181,15 @@ const ProductDetailContent: React.FC = () => {
     fetchProduct();
   }, [id]);
 
-  // Fetch Reviews
   useEffect(() => {
     if (!id) return;
     const q = query(collection(db, "products", id, "reviews"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedReviews: Review[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      snapshot.forEach((snapDoc) => {
+        const data = snapDoc.data();
         fetchedReviews.push({
-          id: doc.id,
+          id: snapDoc.id,
           userId: data.userId,
           user: data.user,
           rating: data.rating,
@@ -192,11 +205,10 @@ const ProductDetailContent: React.FC = () => {
     return () => unsubscribe();
   }, [id]);
 
-  // Audio Handlers
   const togglePlay = () => {
     if (audioRef.current) {
         if (isPlaying) audioRef.current.pause();
-        else audioRef.current.play();
+        else audioRef.current.play().catch(e => console.error("Audio play failed", e));
         setIsPlaying(!isPlaying);
     }
   };
@@ -229,9 +241,9 @@ const ProductDetailContent: React.FC = () => {
       }
   };
 
-  // Logic Helpers
   const isFree = product?.price === 0;
-  const features = (product as any)?.features || [];
+  // Fixed 'any' type conversion
+  const features = (product as (Product & { features?: string[] }))?.features || [];
 
   const checkAuthAndVerification = async () => {
     if (!user) {
@@ -240,13 +252,14 @@ const ProductDetailContent: React.FC = () => {
     }
     const currentUser = auth.currentUser;
     if (currentUser) {
-        try { await currentUser.reload(); } catch(e) {}
+        try { await currentUser.reload(); } catch(e) { console.error(e); }
         if (!currentUser.emailVerified) {
             try {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. A verification link has been sent to ${currentUser.email}.`));
-            } catch (error: any) {
-                 dispatch(setError(error.message));
+            } catch (error: unknown) { // Fixed 'any'
+                 const err = error as { message?: string };
+                 dispatch(setError(err.message || "Verification failed."));
             }
             return false;
         }
@@ -258,9 +271,9 @@ const ProductDetailContent: React.FC = () => {
     return true;
   };
 
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = async (selectedProduct: Product) => {
       const allowed = await checkAuthAndVerification();
-      if (allowed) dispatch(addToCart(product));
+      if (allowed) dispatch(addToCart(selectedProduct));
   };
 
   const handleDownload = async (isDemo: boolean = false) => {
@@ -269,7 +282,6 @@ const ProductDetailContent: React.FC = () => {
 
       setIsDownloading(true);
       try {
-          // Record free order if not demo
           if (!isDemo && isFree && user && product) {
                await addDoc(collection(db, "orders"), {
                   userId: user.id,
@@ -291,7 +303,7 @@ const ProductDetailContent: React.FC = () => {
           const fileName = isDemo ? `${product?.name}_Demo.txt` : `${product?.name}_License.txt`;
           const fileContent = isDemo 
             ? `This is a demo placeholder for ${product?.name}.` 
-            : `Thank you for downloading ${product?.name} from A.S Studio!\n\nProduct: ${product?.name}\nDownload Link: ${product?.productUrl || 'No link provided'}`;
+            : `Thank you for downloading ${product?.name} from A.S Studio!`;
           
           const file = new Blob([fileContent], {type: 'text/plain'});
           element.href = URL.createObjectURL(file);
@@ -336,12 +348,12 @@ const ProductDetailContent: React.FC = () => {
 
   const handleDelete = async (reviewId: string) => {
     if (window.confirm('Delete review?')) {
-      await deleteDoc(doc(db, "products", id!, "reviews", reviewId));
+      await deleteDoc(doc(db, "products", id, "reviews", reviewId));
     }
   };
 
   const handleUpdate = async (reviewId: string, content: string) => {
-    await updateDoc(doc(db, "products", id!, "reviews", reviewId), { content });
+    await updateDoc(doc(db, "products", id, "reviews", reviewId), { content });
   };
 
   const handleShare = async () => {
@@ -364,13 +376,10 @@ const ProductDetailContent: React.FC = () => {
 
     if (navigator.share) {
         try {
-            if (navigator.canShare && !navigator.canShare(shareData)) {
-                 await copyToClipboard();
-                 return;
-            }
             await navigator.share(shareData);
-        } catch (err: any) {
-            if (err.name === 'AbortError') return;
+        } catch (err: unknown) { // Fixed 'any'
+            const error = err as { name?: string };
+            if (error.name === 'AbortError') return;
             await copyToClipboard();
         }
     } else {
@@ -393,7 +402,6 @@ const ProductDetailContent: React.FC = () => {
         </Link>
       </motion.div>
       
-      {/* Product Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
         
         {/* --- LEFT: Image & Audio --- */}
@@ -402,20 +410,23 @@ const ProductDetailContent: React.FC = () => {
             whileInView={{ opacity: 1, scale: 1 }}
             className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl"
         >
-           {/* Product Image */}
            <div className="aspect-square relative">
                {product.image ? (
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                  <Image 
+                    src={product.image} 
+                    alt={product.name} 
+                    fill 
+                    className="object-cover" 
+                    priority
+                  />
                ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700">
                      <ImageIcon className="w-24 h-24 opacity-50" />
                   </div>
                )}
-               {/* Gradient Overlay */}
                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
            </div>
            
-           {/* Audio Player Component */}
            {product.demoUrl && (
                <div className="absolute bottom-6 left-6 right-6">
                   <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-4 rounded-xl flex items-center gap-4 border border-gray-200 dark:border-zinc-800 shadow-lg">
@@ -430,12 +441,12 @@ const ProductDetailContent: React.FC = () => {
                      <button 
                         onClick={togglePlay}
                         className="w-12 h-12 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-700 hover:scale-105 transition-all flex-shrink-0 shadow-lg shadow-rose-600/30"
+                        aria-label={isPlaying ? "Pause" : "Play"}
                      >
                         {isPlaying ? <Pause className="fill-current w-5 h-5" /> : <Play className="fill-current ml-1 w-5 h-5" />}
                      </button>
                      
                      <div className="flex-1 flex flex-col gap-1.5">
-                         {/* Progress Bar */}
                         <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden relative group cursor-pointer">
                            <div className="absolute inset-0 w-full h-full"></div>
                            <div 
@@ -457,7 +468,7 @@ const ProductDetailContent: React.FC = () => {
                         </div>
                      </div>
 
-                     <button onClick={toggleMute} className="text-gray-400 hover:text-rose-600 transition-colors">
+                     <button onClick={toggleMute} className="text-gray-400 hover:text-rose-600 transition-colors" aria-label="Toggle Mute">
                         {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                      </button>
                   </div>
@@ -468,7 +479,6 @@ const ProductDetailContent: React.FC = () => {
         {/* --- RIGHT: Product Info --- */}
         <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="flex flex-col justify-center">
            
-           {/* Badges & Meta */}
            <div className="mb-4 flex items-center justify-between">
               <span className="inline-block px-3 py-1 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-500 font-bold text-xs rounded-full uppercase tracking-wider border border-rose-100 dark:border-rose-900/20">
                   {product.category || 'Product'}
@@ -483,7 +493,6 @@ const ProductDetailContent: React.FC = () => {
              {product.name}
            </h1>
            
-           {/* Reviews Summary & Share */}
            <div className="flex items-center justify-between mb-8 pb-8 border-b border-gray-100 dark:border-zinc-800">
               <div className="flex items-center gap-3">
                   <StarRating rating={product.rating || 5} size="w-5 h-5" />
@@ -504,9 +513,8 @@ const ProductDetailContent: React.FC = () => {
               </button>
            </div>
 
-           {/* Price */}
            <div className="mb-8">
-               <p className="text-4xl font-mono font-bold text-gray-900 dark:text-white flex items-center gap-3">
+               <div className="text-4xl font-mono font-bold text-gray-900 dark:text-white flex items-center gap-3">
                   {isFree ? (
                       <span className="text-green-600 dark:text-green-500">FREE</span>
                   ) : (
@@ -515,16 +523,14 @@ const ProductDetailContent: React.FC = () => {
                         {product.price > 0 && <span className="text-lg text-gray-400 line-through decoration-rose-500/50">₦{Math.round(product.price * 1.5)}</span>}
                       </>
                   )}
-               </p>
+               </div>
            </div>
            
-           {/* Description */}
            <div 
              className="text-gray-600 dark:text-gray-300 mb-8 text-base leading-relaxed whitespace-pre-wrap"
              dangerouslySetInnerHTML={{ __html: product.description }} 
            />
 
-           {/* Features List */}
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {features.map((feat: string, idx: number) => (
                 <div key={idx} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -536,7 +542,6 @@ const ProductDetailContent: React.FC = () => {
               ))}
            </div>
 
-           {/* Action Buttons */}
            <div className="flex flex-col sm:flex-row gap-4 mb-8">
               {isFree ? (
                   <button 
@@ -567,13 +572,12 @@ const ProductDetailContent: React.FC = () => {
               )}
            </div>
 
-           {/* Delivery Note */}
            <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-4 border border-blue-100 dark:border-blue-900/20 flex gap-3">
                 <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <div>
                     <h3 className="font-bold text-sm text-blue-900 dark:text-blue-300 mb-1">Instant Delivery</h3>
                     <p className="text-xs text-blue-700 dark:text-blue-400/80 leading-relaxed">
-                        Files are delivered automatically to your email immediately after purchase. Secure download links expire after 24 hours.
+                        Files are delivered automatically immediately after purchase. links expire after 24 hours.
                     </p>
                 </div>
            </div>
@@ -584,7 +588,6 @@ const ProductDetailContent: React.FC = () => {
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} className="border-t border-gray-100 dark:border-zinc-800 pt-16">
         <div className="flex flex-col md:flex-row gap-12">
            
-           {/* Sidebar: Summary & Form */}
            <div className="w-full md:w-1/3 space-y-8">
               <div>
                  <h2 className="text-2xl font-black mb-4">Customer Reviews</h2>
@@ -636,7 +639,6 @@ const ProductDetailContent: React.FC = () => {
               </div>
            </div>
            
-           {/* Reviews List */}
            <div className="flex-1 space-y-6">
               <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-900 dark:text-white">Recent Comments</h3>
