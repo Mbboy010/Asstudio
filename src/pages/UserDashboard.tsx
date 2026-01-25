@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, updateProfile } from '@/store';
 import { 
-  Clock, Download, Settings, Box, Package, Camera, Edit2, Heart, 
+  Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, LogOut, Trash2
+  User, Shield, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
@@ -16,6 +16,24 @@ import { db } from '@/firebase';
 
 const CROP_SIZE = 280;
 
+interface LibraryItem {
+    id: string;
+    name: string;
+    image: string;
+    category: string;
+    size: string;
+    orderDate: string;
+    productUrl?: string; // Optional real download link
+}
+
+interface OrderItem {
+    id: string;
+    createdAt: string;
+    status: string;
+    total: number;
+    items: any[];
+}
+
 const UserDashboardContent: React.FC = () => {
   const dispatch = useDispatch();
   const { user, loading: authLoading } = useSelector((state: RootState) => state.auth);
@@ -23,8 +41,8 @@ const UserDashboardContent: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   
   // Real-time Orders & Library State
-  const [orders, setOrders] = useState<any[]>([]);
-  const [libraryItems, setLibraryItems] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   
   // Form State
@@ -66,7 +84,7 @@ const UserDashboardContent: React.FC = () => {
                 };
             });
             
-            fetchedOrders.sort((a: any, b: any) => {
+            fetchedOrders.sort((a, b) => {
                 const dateA = new Date(a.createdAt || 0).getTime();
                 const dateB = new Date(b.createdAt || 0).getTime();
                 return dateB - dateA;
@@ -74,10 +92,10 @@ const UserDashboardContent: React.FC = () => {
             
             setOrders(fetchedOrders);
             
-            const allItems: any[] = [];
+            const allItems: LibraryItem[] = [];
             const seenIds = new Set();
             
-            fetchedOrders.forEach((order: any) => {
+            fetchedOrders.forEach((order) => {
                 if (order.status === 'Completed' && Array.isArray(order.items)) {
                     order.items.forEach((item: any) => {
                         const itemId = item.id || `item-${Math.random()}`; 
@@ -89,7 +107,8 @@ const UserDashboardContent: React.FC = () => {
                                 image: item.image,
                                 category: item.category,
                                 size: item.size,
-                                orderDate: order.createdAt
+                                orderDate: order.createdAt,
+                                productUrl: item.productUrl
                             });
                         }
                     });
@@ -117,7 +136,7 @@ const UserDashboardContent: React.FC = () => {
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  // --- Image Handling Logic (Unchanged but type-safe) ---
+  // --- Image Handling Logic ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
@@ -230,15 +249,20 @@ const UserDashboardContent: React.FC = () => {
       }
   };
 
-  const handleDownloadItem = (item: any) => {
-      const element = document.createElement("a");
-      const fileContent = `Thank you for downloading ${item.name} from A.S Studio!\n\nProduct: ${item.name}\nLicense: Royalty-Free\n\nDownload Link: https://asstudio.com/download/${item.id}`;
-      const file = new Blob([fileContent], {type: 'text/plain'});
-      element.href = URL.createObjectURL(file);
-      element.download = `${(item.name || 'product').replace(/\s+/g, '_')}_License.txt`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
+  const handleDownloadItem = (item: LibraryItem) => {
+      if (item.productUrl) {
+          window.open(item.productUrl, '_blank');
+      } else {
+          // Fallback if no direct link
+          const element = document.createElement("a");
+          const fileContent = `Thank you for downloading ${item.name} from A.S Studio!\n\nProduct: ${item.name}\nLicense: Royalty-Free\n\nDownload ID: ${item.id}`;
+          const file = new Blob([fileContent], {type: 'text/plain'});
+          element.href = URL.createObjectURL(file);
+          element.download = `${(item.name || 'product').replace(/\s+/g, '_')}_License.txt`;
+          document.body.appendChild(element);
+          element.click();
+          document.body.removeChild(element);
+      }
   };
 
   const getStatusColor = (status: string) => {
@@ -261,7 +285,7 @@ const UserDashboardContent: React.FC = () => {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
-          className="relative mb-12 rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-xl"
+          className="relative mb-12 rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm"
         >
           {/* Cover Banner */}
           <div className="h-48 bg-gradient-to-r from-rose-900 via-black to-black relative">
@@ -359,7 +383,11 @@ const UserDashboardContent: React.FC = () => {
                               {libraryItems.map((item, idx) => (
                                   <div key={`${item.id}-${idx}`} className="group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 hover:border-rose-500/50 transition-all flex gap-4">
                                       <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
-                                          <img src={item.image || `https://picsum.photos/seed/${item.id}/200`} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                          <img 
+                                            src={item.image || `https://picsum.photos/seed/${item.id}/200`} 
+                                            alt={item.name} 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                                          />
                                       </div>
                                       <div className="flex-1 min-w-0">
                                           <h3 className="font-bold text-gray-900 dark:text-white truncate">{item.name}</h3>
@@ -425,7 +453,11 @@ const UserDashboardContent: React.FC = () => {
                                   <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex items-center justify-between group hover:border-rose-500/30 transition-colors">
                                       <div className="flex items-center gap-4">
                                           <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0">
-                                              <img src={item.image || `https://picsum.photos/seed/${item.id}/200`} className="w-full h-full object-cover" />
+                                              <img 
+                                                src={item.image || `https://picsum.photos/seed/${item.id}/200`} 
+                                                alt={item.name}
+                                                className="w-full h-full object-cover" 
+                                              />
                                           </div>
                                           <h3 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-rose-600 transition-colors">{item.name}</h3>
                                       </div>
@@ -441,7 +473,7 @@ const UserDashboardContent: React.FC = () => {
                     </div>
                 )}
 
-                {/* 4. FAVORITES (Placeholder) */}
+                {/* 4. FAVORITES */}
                 {activeTab === 'Favorites' && <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
 
                 {/* 5. SETTINGS */}
@@ -457,7 +489,7 @@ const UserDashboardContent: React.FC = () => {
                                         type="text" 
                                         value={displayName}
                                         onChange={(e) => setDisplayName(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all" 
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all font-medium" 
                                       />
                                   </div>
                               </div>
@@ -469,14 +501,14 @@ const UserDashboardContent: React.FC = () => {
                                         type="email" 
                                         readOnly 
                                         defaultValue={user?.email} 
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-500 cursor-not-allowed" 
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-500 cursor-not-allowed font-medium" 
                                       />
                                   </div>
                               </div>
                           </div>
                           
                           <div className="flex gap-4">
-                              <button disabled={isSaving} type="submit" className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 flex items-center gap-2 disabled:opacity-70">
+                              <button disabled={isSaving} type="submit" className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 flex items-center gap-2 disabled:opacity-70 active:scale-95">
                                   {isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
                                   Save Changes
                               </button>
@@ -510,7 +542,7 @@ const UserDashboardContent: React.FC = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
             >
                 <motion.div 
                     initial={{ scale: 0.95, opacity: 0 }}
