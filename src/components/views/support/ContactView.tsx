@@ -37,8 +37,9 @@ const ContactView: React.FC = () => {
       
       setStatus('success');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (error: unknown) { // Fixed: Changed from 'any' to 'unknown'
+      const err = error as { message?: string };
+      console.error("Error sending message:", err);
       alert("Failed to send message. Please try again.");
       setStatus('idle');
     }
@@ -59,7 +60,8 @@ const ContactView: React.FC = () => {
         >
            <h1 className="text-4xl md:text-6xl font-black mb-6 text-gray-900 dark:text-white">Get in Touch</h1>
            <p className="text-gray-500 font-medium text-lg max-w-2xl mx-auto">
-             Have questions about our products or need technical support? We're here to help you create your best work.
+             {/* Fixed: Escaped apostrophe in "We're" */}
+             Have questions about our products or need technical support? We&apos;re here to help you create your best work.
            </p>
         </motion.div>
 

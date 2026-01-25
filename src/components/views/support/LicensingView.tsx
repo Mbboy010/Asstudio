@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Check, Shield, AlertTriangle, FileText, Music, Globe, X, Download, FileCheck } from 'lucide-react';
+import { Check, Shield, AlertTriangle, Music, Globe, X, Download, FileCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TextPageSkeleton } from '@/components/ui/Skeleton';
 
@@ -33,7 +33,7 @@ const LicensingView: React.FC = () => {
              </div>
              <h1 className="text-4xl md:text-6xl font-black mb-6 text-gray-900 dark:text-white">Royalty Free License</h1>
              <p className="text-gray-500 font-medium text-lg max-w-2xl mx-auto leading-relaxed">
-               Simple, transparent, and designed for creators. When you buy from A.S Studio, you're buying the freedom to create without legal headaches.
+               Simple, transparent, and designed for creators. When you buy from A.S Studio, you&apos;re buying the freedom to create without legal headaches.
              </p>
           </motion.div>
 
@@ -50,7 +50,7 @@ const LicensingView: React.FC = () => {
              </div>
              
              <div className="relative z-10">
-                <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">The "Standard" License</h2>
+                <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">The &quot;Standard&quot; License</h2>
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-10 text-lg">
                     This license grants you a non-exclusive, non-transferable right to use the audio samples, presets, and MIDI files purchased from A.S Studio in your own musical compositions and productions. This license is valid forever and applies worldwide.
                 </p>
@@ -129,7 +129,7 @@ const LicensingView: React.FC = () => {
                         1. Royalty-Free Guarantee
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                        All products labeled as "Royalty-Free" mean that you do not owe any additional money to A.S Studio or the sound designer, regardless of how successful your track becomes. Whether you get 10 streams or 10 million streams, you keep 100% of your publishing and royalties.
+                        All products labeled as &quot;Royalty-Free&quot; mean that you do not owe any additional money to A.S Studio or the sound designer, regardless of how successful your track becomes. Whether you get 10 streams or 10 million streams, you keep 100% of your publishing and royalties.
                     </p>
                 </div>
              </motion.section>

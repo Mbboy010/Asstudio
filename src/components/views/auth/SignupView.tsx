@@ -9,6 +9,12 @@ import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile,
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
+// Define a type for Firebase errors to avoid 'any'
+interface FirebaseError {
+  message: string;
+  code?: string;
+}
+
 const SignupView: React.FC = () => {
   const router = useRouter();
   
@@ -37,17 +43,12 @@ const SignupView: React.FC = () => {
     setError('');
     
     try {
-      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Update Display Name
       await updateFirebaseProfile(user, { displayName: name });
-      
-      // 3. Send Verification Email
       await sendEmailVerification(user);
 
-      // 4. Create Firestore Document
       const role = email === 'admin@asstudio.com' ? 'admin' : 'user';
 
       await setDoc(doc(db, "users", user.uid), {
@@ -57,13 +58,14 @@ const SignupView: React.FC = () => {
         phone: phone,
         bio: bio,
         role: role,
-        avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
         joinedAt: new Date().toISOString()
       });
 
       router.push('/dashboard');
-    } catch (err: any) {
-      let msg = err.message.replace('Firebase: ', '');
+    } catch (err: unknown) { // Changed 'any' to 'unknown'
+      const firebaseError = err as FirebaseError;
+      let msg = firebaseError.message.replace('Firebase: ', '');
       if (msg.includes('email-already-in-use')) msg = 'This email is already registered.';
       if (msg.includes('weak-password')) msg = 'Password should be at least 6 characters.';
       setError(msg);
@@ -92,14 +94,15 @@ const SignupView: React.FC = () => {
             phone: '',
             bio: '',
             role: isDevAdmin ? 'admin' : 'user',
-            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}&background=random`,
+            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
             joinedAt: new Date().toISOString()
         });
       }
 
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+    } catch (err: unknown) { // Changed 'any' to 'unknown'
+      const firebaseError = err as FirebaseError;
+      setError(firebaseError.message.replace('Firebase: ', ''));
     } finally {
       setLoading(false);
     }
@@ -108,7 +111,6 @@ const SignupView: React.FC = () => {
   return (
     <AuthLayout title="Create Account" subtitle="Join the future of sound design">
        
-       {/* Error Alert */}
        {error && (
         <div className="bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm mb-6 border border-red-100 dark:border-red-900/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
@@ -118,7 +120,6 @@ const SignupView: React.FC = () => {
 
        <form onSubmit={handleSignup} className="space-y-4">
         
-        {/* Full Name */}
         <div>
           <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Full Name</label>
           <div className="relative group">
@@ -136,7 +137,6 @@ const SignupView: React.FC = () => {
           </div>
         </div>
 
-        {/* Email */}
         <div>
           <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Email Address</label>
           <div className="relative group">
@@ -154,7 +154,6 @@ const SignupView: React.FC = () => {
           </div>
         </div>
 
-        {/* Two Column: Phone & Bio */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Phone (Optional)</label>
@@ -188,7 +187,6 @@ const SignupView: React.FC = () => {
             </div>
         </div>
 
-        {/* Two Column: Passwords */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Password</label>
@@ -238,7 +236,6 @@ const SignupView: React.FC = () => {
           </div>
         </div>
         
-        {/* Submit Button */}
         <button 
             disabled={loading} 
             type="submit" 
@@ -252,7 +249,6 @@ const SignupView: React.FC = () => {
         </button>
       </form>
 
-      {/* Social Login Divider */}
       <div className="my-8 flex items-center gap-4">
          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Or register with</span>

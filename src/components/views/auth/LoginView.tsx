@@ -9,6 +9,12 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
+// Interface for Firebase errors to replace 'any'
+interface FirebaseError {
+  message: string;
+  code?: string;
+}
+
 const LoginView: React.FC = () => {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -24,9 +30,10 @@ const LoginView: React.FC = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard'); 
-    } catch (err: any) {
+    } catch (err: unknown) { // Changed 'any' to 'unknown'
+      const firebaseError = err as FirebaseError;
       // Clean up Firebase error messages for better UX
-      let msg = err.message.replace('Firebase: ', '');
+      let msg = firebaseError.message.replace('Firebase: ', '');
       if (msg.includes('auth/invalid-credential')) msg = 'Invalid email or password.';
       setError(msg);
     } finally {
@@ -46,20 +53,22 @@ const LoginView: React.FC = () => {
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
-        const isDevAdmin = user.email === 'admin@asstudio.com'; // Change this to your admin email
+        const isDevAdmin = user.email === 'admin@asstudio.com'; 
         await setDoc(doc(db, "users", user.uid), {
             id: user.uid,
             name: user.displayName || 'User',
             email: user.email,
             role: isDevAdmin ? 'admin' : 'user',
-            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'User'}&background=random`,
+            // Added encodeURIComponent to handle spaces in names
+            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
             joinedAt: new Date().toISOString()
         });
       }
 
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+    } catch (err: unknown) { // Changed 'any' to 'unknown'
+      const firebaseError = err as FirebaseError;
+      setError(firebaseError.message.replace('Firebase: ', ''));
     } finally {
       setLoading(false);
     }
@@ -154,7 +163,8 @@ const LoginView: React.FC = () => {
       <SocialLogin onClick={handleGoogleLogin} />
 
       <div className="text-center text-sm text-gray-500 mt-8">
-         Don't have an account? <Link href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</Link>
+         {/* Fixed: Escaped apostrophe here */}
+         Don&apos;t have an account? <Link href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</Link>
       </div>
     </AuthLayout>
   );

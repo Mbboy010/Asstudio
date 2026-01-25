@@ -7,6 +7,12 @@ import { auth } from '@/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { AuthLayout } from '@/components/AuthShared';
 
+// Define an interface for the Firebase error to satisfy the compiler
+interface AuthError {
+  message: string;
+  code?: string;
+}
+
 const ForgotPasswordView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -20,8 +26,9 @@ const ForgotPasswordView: React.FC = () => {
     try {
         await sendPasswordResetEmail(auth, email);
         setSubmitted(true);
-    } catch (err: any) {
-        let msg = err.message.replace('Firebase: ', '');
+    } catch (err: unknown) { // Changed 'any' to 'unknown'
+        const firebaseError = err as AuthError;
+        let msg = firebaseError.message.replace('Firebase: ', '');
         if (msg.includes('user-not-found')) msg = 'No account found with this email.';
         setError(msg);
     } finally {
@@ -32,7 +39,7 @@ const ForgotPasswordView: React.FC = () => {
   // Success State
   if (submitted) {
     return (
-      <AuthLayout title="Check your inbox" subtitle="We've sent you a secure link">
+      <AuthLayout title="Check your inbox" subtitle="We&apos;ve sent you a secure link">
         <div className="text-center py-6">
           <div className="w-20 h-20 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-300">
              <CheckCircle className="w-10 h-10" />
