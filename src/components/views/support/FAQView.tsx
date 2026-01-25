@@ -2,17 +2,36 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Search, HelpCircle, FileAudio, CreditCard, ShieldCheck, Download, Plus, Minus } from 'lucide-react';
+import { Search, HelpCircle, CreditCard, ShieldCheck, Download, Plus, Minus, LucideIcon } from 'lucide-react';
 import { TextPageSkeleton } from '@/components/ui/Skeleton';
 
-const faqCategories = [
+// --- Interfaces ---
+interface FAQCategory {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+}
+
+interface FAQEntry {
+  category: string;
+  question: string;
+  answer: string;
+}
+
+interface FAQItemProps {
+  question: string;
+  answer: string;
+}
+
+// --- Data ---
+const faqCategories: FAQCategory[] = [
   { id: 'general', name: 'General', icon: HelpCircle },
   { id: 'products', name: 'Products & Downloads', icon: Download },
   { id: 'billing', name: 'Billing & Payments', icon: CreditCard },
   { id: 'licensing', name: 'Licensing', icon: ShieldCheck },
 ];
 
-const faqData = [
+const faqData: FAQEntry[] = [
   {
     category: 'general',
     question: 'What is A.S Studio?',
@@ -50,7 +69,7 @@ const faqData = [
   },
 ];
 
-const FAQItem: React.FC<{ question: string, answer: string }> = ({ question, answer }) => {
+const FAQItem: React.FC<FAQItemProps> = ({ question, answer }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -186,7 +205,7 @@ const FAQView: React.FC = () => {
                 <Search className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No results found</h3>
-              <p className="text-gray-500">We couldn't find any answers matching "{searchTerm}".</p>
+              <p className="text-gray-500">We couldn&apos;t find any answers matching &quot;{searchTerm}&quot;.</p>
             </div>
           )}
         </div>
@@ -204,7 +223,7 @@ const FAQView: React.FC = () => {
 
            <div className="relative z-10">
                 <h3 className="text-2xl md:text-3xl font-black mb-4 text-white">Still have questions?</h3>
-                <p className="text-gray-400 mb-8 max-w-lg mx-auto text-lg">Can't find the answer you're looking for? Please chat to our friendly team.</p>
+                <p className="text-gray-400 mb-8 max-w-lg mx-auto text-lg">Can&apos;t find the answer you&apos;re looking for? Please chat to our friendly team.</p>
                 <a href="/support/contact" className="inline-flex items-center gap-2 px-8 py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20 active:scale-95">
                     Contact Support
                 </a>

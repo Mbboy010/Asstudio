@@ -6,11 +6,12 @@ import {
   BarChart, Bar 
 } from 'recharts';
 import { ChartSkeleton, TableSkeleton } from '@/components/ui/Skeleton';
-import { Users, DollarSign, Activity, Globe, TrendingUp, Package } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { Users, DollarSign, Activity, Package, LucideIcon } from 'lucide-react';
+import { collection, getDocs, query, orderBy, limit, DocumentData } from 'firebase/firestore';
 import { db } from '@/firebase';
 import Link from 'next/link';
 
+// --- Types ---
 interface UserData {
     id: string;
     name: string;
@@ -20,8 +21,38 @@ interface UserData {
     avatar: string;
 }
 
+interface OrderItem {
+    category?: string;
+    [key: string]: unknown;
+}
+
+interface OrderData {
+    status?: string;
+    total?: number;
+    userId?: string;
+    items?: OrderItem[];
+    createdAt?: string;
+}
+
+interface TrafficData {
+    name: string;
+    orders: number;
+}
+
+interface SalesData {
+    name: string;
+    sales: number;
+}
+
+interface CardProps {
+    title: string;
+    value: string | number;
+    icon: LucideIcon | React.ElementType;
+    colorClass: string;
+}
+
 const AdminOverviewView: React.FC = () => {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState({
       users: 0,
       revenue: 0,
@@ -29,8 +60,8 @@ const AdminOverviewView: React.FC = () => {
       totalProducts: 0
   });
   const [recentUsers, setRecentUsers] = useState<UserData[]>([]);
-  const [trafficData, setTrafficData] = useState<any[]>([]);
-  const [salesData, setSalesData] = useState<any[]>([]);
+  const [trafficData, setTrafficData] = useState<TrafficData[]>([]);
+  const [salesData, setSalesData] = useState<SalesData[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,7 +92,7 @@ const AdminOverviewView: React.FC = () => {
 
             // 2. Process Orders
             let totalRevenue = 0;
-            const uniqueBuyers = new Set();
+            const uniqueBuyers = new Set<string>();
             const categoryCount: Record<string, number> = {};
             
             // Last 7 Days Bucket
@@ -73,8 +104,8 @@ const AdminOverviewView: React.FC = () => {
             const dailyOrders: Record<string, number> = {};
             last7Days.forEach(day => dailyOrders[day] = 0);
 
-            ordersSnap.forEach(doc => {
-                const data = doc.data();
+            ordersSnap.forEach((doc) => {
+                const data = doc.data() as OrderData;
                 const orderDate = data.createdAt ? data.createdAt.split('T')[0] : '';
                 
                 if (last7Days.includes(orderDate)) {
@@ -86,7 +117,7 @@ const AdminOverviewView: React.FC = () => {
                     if (data.userId) uniqueBuyers.add(data.userId);
 
                     if (data.items && Array.isArray(data.items)) {
-                        data.items.forEach((item: any) => {
+                        data.items.forEach((item) => {
                             const cat = item.category || 'Other';
                             categoryCount[cat] = (categoryCount[cat] || 0) + 1;
                         });
@@ -94,12 +125,12 @@ const AdminOverviewView: React.FC = () => {
                 }
             });
 
-            const realTrafficData = last7Days.map(date => ({
+            const realTrafficData: TrafficData[] = last7Days.map(date => ({
                 name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
                 orders: dailyOrders[date]
             }));
 
-            const realSalesData = Object.keys(categoryCount).map(cat => ({
+            const realSalesData: SalesData[] = Object.keys(categoryCount).map(cat => ({
                 name: cat,
                 sales: categoryCount[cat]
             }));
@@ -127,16 +158,12 @@ const AdminOverviewView: React.FC = () => {
     fetchData();
   }, []);
 
-  const Card = ({ title, value, icon: Icon, colorClass }: any) => (
+  const Card: React.FC<CardProps> = ({ title, value, icon: Icon, colorClass }) => (
      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm hover:border-rose-200 dark:hover:border-zinc-700 transition-colors">
         <div className="flex justify-between items-start mb-4">
            <div className={`p-3 rounded-xl ${colorClass}`}>
               <Icon className="w-6 h-6" />
            </div>
-           {/* Placeholder for percentage change if needed */}
-           {/* <span className="text-xs font-mono text-green-600 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded flex items-center gap-1">
-             <TrendingUp className="w-3 h-3" /> +12%
-           </span> */}
         </div>
         <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-1">{value}</h3>
         <p className="text-gray-500 font-medium text-sm">{title}</p>
@@ -224,7 +251,7 @@ const AdminOverviewView: React.FC = () => {
                    />
                    <Tooltip 
                       contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', color: '#fff' }}
-                      itemStyle={{ color: '#fb7185' }} // Rose-400
+                      itemStyle={{ color: '#fb7185' }}
                       cursor={{ stroke: '#e11d48', strokeWidth: 1 }}
                    />
                    <Area type="monotone" dataKey="orders" stroke="#e11d48" strokeWidth={3} fillOpacity={1} fill="url(#colorOrders)" />
@@ -265,7 +292,7 @@ const AdminOverviewView: React.FC = () => {
                         dx={-10}
                     />
                     <Tooltip 
-                      cursor={{fill: 'rgba(225, 29, 72, 0.1)'}} // Rose tint
+                      cursor={{fill: 'rgba(225, 29, 72, 0.1)'}}
                       contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', color: '#fff' }}
                     />
                     <Bar dataKey="sales" fill="#e11d48" radius={[6, 6, 0, 0]} barSize={40} />
