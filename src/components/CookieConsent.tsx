@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Cookie, X } from 'lucide-react';
 
 export const CookieConsent: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
 
   useEffect(() => {
     // Check if user has already made a choice
@@ -46,7 +46,7 @@ export const CookieConsent: React.FC = () => {
               <div className="space-y-1">
                 <h3 className="font-bold text-lg text-gray-900 dark:text-white">We use cookies</h3>
                 <p className="text-gray-500 font-medium text-sm leading-relaxed max-w-xl">
-                  We use cookies to enhance your browsing experience, save your search preferences, and analyze our traffic. By clicking "Accept", you consent to our use of cookies.
+                  We use cookies to enhance your browsing experience, save your search preferences, and analyze our traffic. By clicking &quot;Accept&quot;, you consent to our use of cookies.
                 </p>
               </div>
             </div>

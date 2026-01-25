@@ -38,11 +38,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             try {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. A verification link has been sent to ${currentUser.email}. Please verify and checkout again.`));
-            } catch (error: any) {
-                 if (error.code === 'auth/too-many-requests') {
+            } catch (error: unknown) {
+                 // Type guard for the error object
+                 const err = error as { code?: string; message?: string };
+                 if (err.code === 'auth/too-many-requests') {
                      dispatch(setError("Verification email already sent. Please check your inbox."));
                  } else {
-                     dispatch(setError(error.message));
+                     dispatch(setError(err.message || "An error occurred."));
                  }
             }
             return;
@@ -52,6 +54,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         router.push('/login');
         return;
     }
+    
+    // 
 
     setIsCheckingOut(true);
     try {
@@ -149,7 +153,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                            <ShoppingBag className="w-10 h-10 text-gray-300 dark:text-zinc-600" />
                        </div>
                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Your cart is empty</h3>
-                       <p className="text-gray-500 mb-8">Looks like you haven't added any sounds yet.</p>
+                       <p className="text-gray-500 mb-8">Looks like you haven&apos;t added any sounds yet.</p>
                        <button onClick={() => dispatch(toggleCart())} className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20">
                           Start Shopping
                        </button>

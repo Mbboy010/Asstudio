@@ -3,17 +3,22 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ShoppingBag, Settings, ClipboardList, CloudUpload, Library, MessageSquare, Activity, X } from 'lucide-react';
+import { 
+  LayoutDashboard, Users, ShoppingBag, Settings, 
+  ClipboardList, CloudUpload, Library, MessageSquare, 
+  Activity, X, LucideIcon 
+} from 'lucide-react';
 
+// I've used LucideIcon here to replace 'any'
 interface SidebarItemProps {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   path: string;
   active: boolean;
   onClick?: () => void;
 }
 
-const SidebarItem = ({ icon: Icon, label, path, active, onClick }: SidebarItemProps) => (
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, active, onClick }) => (
   <Link href={path} onClick={onClick}>
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
       active 
@@ -26,7 +31,13 @@ const SidebarItem = ({ icon: Icon, label, path, active, onClick }: SidebarItemPr
   </Link>
 );
 
-export const AdminSidebar = ({ mobileOpen, onClose }: { mobileOpen: boolean, onClose: () => void }) => {
+// Properly typed the props for the main component
+interface AdminSidebarProps {
+  mobileOpen: boolean;
+  onClose: () => void;
+}
+
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose }) => {
   const pathname = usePathname();
 
   return (

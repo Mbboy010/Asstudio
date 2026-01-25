@@ -59,11 +59,12 @@ export const Navbar: React.FC = () => {
             try {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. A new verification link has been sent to ${currentUser.email}. Please verify your email and try again.`));
-            } catch (error: any) {
-                if (error.code === 'auth/too-many-requests') {
+            } catch (error: unknown) {
+                const err = error as { code?: string; message?: string };
+                if (err.code === 'auth/too-many-requests') {
                    dispatch(setError("Verification email already sent. Please check your inbox."));
                 } else {
-                   dispatch(setError("Failed to send verification email. " + error.message));
+                   dispatch(setError("Failed to send verification email. " + (err.message || "")));
                 }
             }
             return;
@@ -238,7 +239,11 @@ export const Navbar: React.FC = () => {
               {isAuthenticated ? (
                  <>
                   <div className="px-4 mb-4 flex items-center gap-3">
-                    <img src={user?.avatar || "https://ui-avatars.com/api/?name=User"} className="w-10 h-10 rounded-full" />
+                    <img 
+                        src={user?.avatar || "https://ui-avatars.com/api/?name=User"} 
+                        alt="User Avatar"
+                        className="w-10 h-10 rounded-full" 
+                    />
                     <div>
                       <p className="font-bold text-gray-900 dark:text-white">{user?.displayName}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>

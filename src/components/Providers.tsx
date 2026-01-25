@@ -8,6 +8,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/firebase';
 import { ThemeProvider } from 'next-themes';
 
+// Define the User interface to match your Redux slice
+interface AppUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  avatar: string;
+  joinedAt: string;
+  emailVerified: boolean;
+}
+
 interface AuthListenerProps {
   children: React.ReactNode;
 }
@@ -16,27 +27,32 @@ const AuthListener: React.FC<AuthListenerProps> = ({ children }) => {
   const dispatch = useDispatch();
 
   useEffect(() => {
+    // 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       dispatch(setLoading(true));
       if (firebaseUser) {
         const isDevAdmin = firebaseUser.email === 'admin@asstudio.com';
         try {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            dispatch(setUser({
-              ...userData,
+            
+            // Construct user object with explicit typing
+            const appUser: AppUser = {
               id: firebaseUser.uid,
               email: firebaseUser.email || userData.email,
-              role: isDevAdmin ? 'admin' : userData.role,
-              emailVerified: firebaseUser.emailVerified,
               name: userData.name || firebaseUser.displayName || 'User',
+              role: isDevAdmin ? 'admin' : userData.role,
               avatar: userData.avatar || firebaseUser.photoURL || '',
-              joinedAt: userData.joinedAt || new Date().toISOString()
-            } as any));
+              joinedAt: userData.joinedAt || new Date().toISOString(),
+              emailVerified: firebaseUser.emailVerified
+            };
+
+            dispatch(setUser(appUser));
           } else {
-             // Fallback
-             dispatch(setUser({
+             // Fallback for new users or missing docs
+             const fallbackUser: AppUser = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || '',
                 name: firebaseUser.displayName || 'User',
@@ -44,7 +60,9 @@ const AuthListener: React.FC<AuthListenerProps> = ({ children }) => {
                 role: isDevAdmin ? 'admin' : 'user',
                 joinedAt: new Date().toISOString(),
                 emailVerified: firebaseUser.emailVerified
-            } as any));
+            };
+            
+            dispatch(setUser(fallbackUser));
           }
         } catch (error) {
           console.error("Auth Error", error);
