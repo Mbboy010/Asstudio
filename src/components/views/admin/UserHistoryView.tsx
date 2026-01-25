@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Package, Clock, Mail, Calendar, Loader, Phone, FileText, User as UserIcon, Wallet, ShoppingBag } from 'lucide-react';
+import Image from 'next/image'; // Fixed: Import optimized Image component
+import { ArrowLeft, Package, Clock, Mail, Calendar, Loader, Phone, FileText, ShoppingBag } from 'lucide-react';
+// Removed unused imports: UserIcon, Wallet
 import { motion } from 'framer-motion';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -19,10 +21,18 @@ interface UserDetail {
     role: string;
 }
 
+// Fixed: Defined OrderItem to replace 'any'
+interface OrderItem {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+}
+
 interface Order {
     id: string;
     createdAt: string;
-    items: any[];
+    items: OrderItem[]; 
     total: number;
     status: string;
 }
@@ -39,26 +49,22 @@ const AdminUserHistoryView: React.FC = () => {
         if (!id) return;
         setLoading(true);
         try {
-            // Fetch User Data
             const userRef = doc(db, "users", id);
             const userSnap = await getDoc(userRef);
             
             if (userSnap.exists()) {
                 setUser({ id: userSnap.id, ...userSnap.data() } as UserDetail);
-            } else {
-                console.error("User not found");
             }
 
-            // Fetch User Orders
             const q = query(collection(db, "orders"), where("userId", "==", id));
             const querySnapshot = await getDocs(q);
             const fetchedOrders: Order[] = [];
             let spent = 0;
 
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
+            querySnapshot.forEach((docSnap) => {
+                const data = docSnap.data();
                 fetchedOrders.push({
-                    id: doc.id,
+                    id: docSnap.id,
                     createdAt: data.createdAt,
                     items: data.items || [],
                     total: data.total || 0,
@@ -69,13 +75,12 @@ const AdminUserHistoryView: React.FC = () => {
                 }
             });
 
-            // Sort manually since we didn't add compound index yet for order+userId
             fetchedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
             setOrders(fetchedOrders);
             setStats({ totalSpent: spent, orderCount: fetchedOrders.length });
 
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error fetching user history:", error);
         } finally {
             setLoading(false);
@@ -92,7 +97,6 @@ const AdminUserHistoryView: React.FC = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-black py-6 transition-colors duration-300">
         <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header / Back Link */}
         <div className="flex items-center gap-4">
             <Link 
                 href="/mb/admin/users" 
@@ -107,7 +111,6 @@ const AdminUserHistoryView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: User Profile Card */}
             <div className="lg:col-span-1 space-y-6">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -118,10 +121,12 @@ const AdminUserHistoryView: React.FC = () => {
                     
                     <div className="relative text-center">
                         <div className="w-32 h-32 mx-auto mb-4 relative">
-                            <img 
+                            <Image 
                                 src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`} 
                                 alt={user.name} 
-                                className="w-full h-full rounded-full border-4 border-white dark:border-zinc-900 object-cover shadow-lg" 
+                                width={128}
+                                height={128}
+                                className="rounded-full border-4 border-white dark:border-zinc-900 object-cover shadow-lg" 
                             />
                             <div className="absolute bottom-1 right-1 bg-green-500 w-5 h-5 rounded-full border-2 border-white dark:border-zinc-900"></div>
                         </div>
@@ -195,7 +200,9 @@ const AdminUserHistoryView: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-400 font-medium mb-1">Bio</p>
-                                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed italic">"{user.bio}"</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed italic">
+                                        &quot;{user.bio}&quot;
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -203,7 +210,6 @@ const AdminUserHistoryView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Right Column: History Feed */}
             <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                     <div className="p-6 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center">
@@ -259,7 +265,6 @@ const AdminUserHistoryView: React.FC = () => {
                                         </div>
                                     </div>
                                     
-                                    {/* Item Preview (Optional expansion) */}
                                     <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700/50 flex items-center gap-2 text-xs text-gray-500 font-medium">
                                         <Package className="w-3.5 h-3.5" />
                                         <span>Includes {order.items.length} items</span>
@@ -275,7 +280,7 @@ const AdminUserHistoryView: React.FC = () => {
                                     <Package className="w-8 h-8 text-gray-400" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">No Orders Yet</h3>
-                                <p className="text-gray-500 text-sm">This user hasn't made any purchases.</p>
+                                <p className="text-gray-500 text-sm">This user hasn&apos;t made any purchases.</p>
                             </div>
                         )}
                     </div>

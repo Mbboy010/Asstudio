@@ -1,16 +1,28 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MoreHorizontal, CheckCircle, Clock, XCircle, ChevronDown, Package, RefreshCcw, ArrowLeft, ArrowRight, User } from 'lucide-react';
+import { 
+  Search, Filter, MoreHorizontal, CheckCircle, Clock, XCircle, 
+  ChevronDown, Package, RefreshCcw, ArrowLeft, ArrowRight, User 
+} from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { TableSkeleton } from '@/components/ui/Skeleton';
+
+// Added specific interface for order items to replace 'any'
+interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
 
 interface Order {
     id: string;
     userId: string;
     userEmail: string;
-    items: any[];
+    items: OrderItem[]; // Fixed 'any[]'
     total: number;
     status: string;
     createdAt: string;
@@ -31,10 +43,10 @@ const AdminOrdersView: React.FC = () => {
         const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const fetchedOrders: Order[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
             fetchedOrders.push({
-                id: doc.id,
+                id: docSnap.id,
                 userId: data.userId,
                 userEmail: data.userEmail || 'Unknown',
                 items: data.items || [],
@@ -44,7 +56,7 @@ const AdminOrdersView: React.FC = () => {
             });
         });
         setOrders(fetchedOrders);
-    } catch (error) {
+    } catch (error: unknown) { // Fixed implicit 'any' in catch block
         console.error("Error fetching orders:", error);
     } finally {
         setLoading(false);
@@ -94,7 +106,6 @@ const AdminOrdersView: React.FC = () => {
           <p className="text-gray-500 font-medium mt-1">Track and manage customer purchases.</p>
         </div>
         
-        {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
            <div className="relative w-full sm:w-auto group">
              <Search className="absolute left-3 top-3 text-gray-400 w-4 h-4 group-focus-within:text-rose-600 transition-colors" />
@@ -122,7 +133,6 @@ const AdminOrdersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Orders Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 overflow-hidden shadow-sm">
          {loading ? (
              <div className="p-8"><TableSkeleton /></div>
@@ -195,7 +205,7 @@ const AdminOrdersView: React.FC = () => {
                                 <td colSpan={7} className="px-6 py-16 text-center text-gray-500">
                                     <div className="flex flex-col items-center justify-center gap-3">
                                         <div className="w-12 h-12 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-                                            <Package className="w-6 h-6 opacity-40" />
+                                            <User className="w-6 h-6 opacity-40" />
                                         </div>
                                         <p className="font-medium">No orders found.</p>
                                     </div>
@@ -206,7 +216,7 @@ const AdminOrdersView: React.FC = () => {
                     </table>
                 </div>
 
-                {/* Footer / Pagination */}
+                {/* Pagination */}
                 <div className="px-6 py-4 border-t border-gray-200 dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50 dark:bg-zinc-900">
                     <div className="text-sm text-gray-500 font-medium">
                         Showing <span className="font-bold text-gray-900 dark:text-white">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredOrders.length)}</span> of {filteredOrders.length} orders

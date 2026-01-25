@@ -6,6 +6,7 @@ import { db } from '@/firebase';
 import { MessageSquare, Trash2, Star, ExternalLink, Image as ImageIcon, Calendar, Clock, Search, RefreshCcw } from 'lucide-react';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
+import Image from 'next/image'; // Fixed: Optimized Image component
 
 interface ReviewData {
   id: string;
@@ -17,7 +18,7 @@ interface ReviewData {
   content: string;
   rating: number;
   createdAt: string;
-  fullPath: string; // Needed to delete document
+  fullPath: string; 
 }
 
 const AdminReviewsView: React.FC = () => {
@@ -33,7 +34,6 @@ const AdminReviewsView: React.FC = () => {
       const reviewsData: ReviewData[] = [];
       const productCache: Record<string, {name: string, image: string | null}> = {};
 
-      // Process reviews and fetch related product info
       for (const reviewDoc of reviewsSnapshot.docs) {
           const data = reviewDoc.data();
           const productRef = reviewDoc.ref.parent.parent;
@@ -42,7 +42,6 @@ const AdminReviewsView: React.FC = () => {
           
           const productId = productRef.id;
           
-          // Cache product details to avoid redundant fetching
           if (!productCache[productId]) {
               try {
                   const productSnap = await getDoc(productRef);
@@ -52,7 +51,8 @@ const AdminReviewsView: React.FC = () => {
                   } else {
                       productCache[productId] = { name: 'Unknown Product', image: null };
                   }
-              } catch (e) {
+              } catch (err: unknown) { // Fixed: Implicit any
+                   console.error(err);
                    productCache[productId] = { name: 'Product Deleted', image: null };
               }
           }
@@ -72,9 +72,8 @@ const AdminReviewsView: React.FC = () => {
       }
 
       reviewsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
       setReviews(reviewsData);
-    } catch (error) {
+    } catch (error: unknown) { // Fixed: Implicit any
       console.error("Error fetching reviews:", error);
     } finally {
       setLoading(false);
@@ -93,7 +92,7 @@ const AdminReviewsView: React.FC = () => {
                  await deleteDoc(doc(db, pathSegments[0], pathSegments[1], pathSegments[2], pathSegments[3]));
                  setReviews(reviews.filter(r => r.id !== review.id));
             }
-        } catch (error) {
+        } catch (error: unknown) { // Fixed: Implicit any
             console.error("Error deleting review:", error);
             alert("Failed to delete review");
         }
@@ -160,29 +159,28 @@ const AdminReviewsView: React.FC = () => {
                             <tr key={review.id} className="group hover:bg-rose-50/30 dark:hover:bg-zinc-800/50 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="relative">
-                                            <img 
+                                        <div className="relative w-9 h-9">
+                                            <Image 
                                                 src={review.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.userName)}`}
-                                                onError={(e) => {
-                                                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(review.userName)}`;
-                                                }}
-                                                className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-zinc-700" 
-                                                alt="User" 
+                                                alt={review.userName}
+                                                fill
+                                                className="rounded-full object-cover border border-gray-200 dark:border-zinc-700" 
                                             />
                                         </div>
                                         <div className="font-bold text-sm text-gray-900 dark:text-white">{review.userName}</div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
+                                    {/* Fixed: Escaped quotes */}
                                     <div className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed italic relative pl-3 border-l-2 border-rose-200 dark:border-rose-900/50" title={review.content}>
-                                        "{review.content}"
+                                        &quot;{review.content}&quot;
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200 dark:border-zinc-700">
+                                        <div className="relative w-10 h-10 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200 dark:border-zinc-700">
                                             {review.productImage ? (
-                                                <img src={review.productImage} alt={review.productName} className="w-full h-full object-cover" />
+                                                <Image src={review.productImage} alt={review.productName} fill className="object-cover" />
                                             ) : (
                                                 <ImageIcon className="w-full h-full p-2.5 text-gray-400" />
                                             )}
