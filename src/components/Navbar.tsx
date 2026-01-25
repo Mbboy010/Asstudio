@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image'; // Added for optimization
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, logout, toggleCart, setError } from '../store';
@@ -11,12 +12,26 @@ import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useTheme } from 'next-themes';
 
+// Define the shape of your User to fix the TypeScript build error
+interface AuthUser {
+  uid?: string;
+  email?: string | null;
+  displayName?: string | null;
+  avatar?: string | null;
+  role?: string;
+}
+
 export const Navbar: React.FC = () => {
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
   const { items } = useSelector((state: RootState) => state.cart);
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  
+  // Cast the auth state to include our AuthUser interface
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth) as { 
+    user: AuthUser | null; 
+    isAuthenticated: boolean 
+  };
   
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -25,12 +40,10 @@ export const Navbar: React.FC = () => {
 
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Avoid hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
@@ -155,7 +168,7 @@ export const Navbar: React.FC = () => {
               {mounted ? (
                 theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />
               ) : (
-                <div className="w-5 h-5" /> // Skeleton placeholder
+                <div className="w-5 h-5" />
               )}
             </button>
 
@@ -172,8 +185,14 @@ export const Navbar: React.FC = () => {
             {/* User Profile */}
             {isAuthenticated ? (
               <div className="relative group ml-2">
-                <Link href="/dashboard" className="block p-0.5 rounded-full border-2 border-transparent hover:border-rose-500 transition-all">
-                  <img src={user?.avatar || "https://ui-avatars.com/api/?name=User&background=random"} alt="User" className="w-8 h-8 rounded-full object-cover bg-gray-200" />
+                <Link href="/dashboard" className="block p-0.5 rounded-full border-2 border-transparent hover:border-rose-500 transition-all overflow-hidden">
+                  <Image 
+                    src={user?.avatar || "https://ui-avatars.com/api/?name=User&background=random"} 
+                    alt="User" 
+                    width={32}
+                    height={32}
+                    className="rounded-full object-cover bg-gray-200" 
+                  />
                 </Link>
                 
                 {/* Dropdown */}
@@ -239,13 +258,16 @@ export const Navbar: React.FC = () => {
               {isAuthenticated ? (
                  <>
                   <div className="px-4 mb-4 flex items-center gap-3">
-                    <img 
-                        src={user?.avatar || "https://ui-avatars.com/api/?name=User"} 
-                        alt="User Avatar"
-                        className="w-10 h-10 rounded-full" 
-                    />
+                    <div className="relative w-10 h-10">
+                      <Image 
+                          src={user?.avatar || "https://ui-avatars.com/api/?name=User"} 
+                          alt="User Avatar"
+                          fill
+                          className="rounded-full object-cover" 
+                      />
+                    </div>
                     <div>
-                      <p className="font-bold text-gray-900 dark:text-white">{user?.displayName}</p>
+                      <p className="font-bold text-gray-900 dark:text-white">{user?.displayName || 'User'}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
                   </div>
