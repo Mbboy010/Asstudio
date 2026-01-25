@@ -10,6 +10,7 @@ import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/fi
 import { db } from '@/firebase';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
+import Image from 'next/image'; // Added for optimization
 
 const AdminManageContentView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -150,9 +151,14 @@ const AdminManageContentView: React.FC = () => {
                                 <tr key={item.id} className="group hover:bg-rose-50/50 dark:hover:bg-zinc-800/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shrink-0 border border-gray-200 dark:border-zinc-700">
+                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800 shrink-0 border border-gray-200 dark:border-zinc-700">
                                                 {item.image ? (
-                                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                    <Image 
+                                                      src={item.image} 
+                                                      alt={item.name} 
+                                                      fill 
+                                                      className="object-cover" 
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                         <ImageIcon className="w-5 h-5" />
@@ -175,7 +181,11 @@ const AdminManageContentView: React.FC = () => {
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-1 text-xs text-gray-500 font-medium">
                                             <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5 text-gray-400" /> {item.size || 'N/A'}</span>
-                                            <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-gray-400" /> {new Date(item.uploadDate).toLocaleDateString()}</span>
+                                            {/* Fix: Check if uploadDate exists before creating Date object */}
+                                            <span className="flex items-center gap-1.5">
+                                              <Calendar className="w-3.5 h-3.5 text-gray-400" /> 
+                                              {item.uploadDate ? new Date(item.uploadDate).toLocaleDateString() : 'Date N/A'}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-mono font-bold text-sm text-gray-900 dark:text-white">
