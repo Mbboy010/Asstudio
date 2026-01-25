@@ -9,7 +9,6 @@ import {
   Activity, X, LucideIcon 
 } from 'lucide-react';
 
-// I've used LucideIcon here to replace 'any'
 interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
@@ -23,7 +22,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, acti
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
       active 
       ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20 translate-x-1' 
-      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800'
+      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:white hover:bg-gray-100 dark:hover:bg-zinc-800'
     }`}>
       <Icon className={`w-5 h-5 ${active ? 'text-white' : ''}`} />
       <span>{label}</span>
@@ -31,14 +30,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, acti
   </Link>
 );
 
-// Properly typed the props for the main component
 interface AdminSidebarProps {
   mobileOpen: boolean;
   onClose: () => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose }) => {
-  const pathname = usePathname();
+  // pathname can be null, so we handle it with a fallback
+  const pathname = usePathname() || '';
 
   return (
     <>
@@ -93,7 +92,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  icon={Users} 
                  label="Users" 
                  path="/mb/admin/users" 
-                 active={pathname.includes('/mb/admin/users')}
+                 // Updated: Added optional chaining and fallback check
+                 active={pathname ? pathname.includes('/mb/admin/users') : false}
                  onClick={onClose}
                />
 
@@ -116,7 +116,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  icon={ShoppingBag} 
                  label="Products Grid" 
                  path="/mb/admin/products" 
-                 active={pathname.includes('/mb/admin/products')}
+                 active={pathname ? pathname.includes('/mb/admin/products') : false}
                  onClick={onClose}
                />
 
@@ -125,7 +125,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  icon={ClipboardList} 
                  label="Orders" 
                  path="/mb/admin/orders" 
-                 active={pathname.includes('/mb/admin/orders')}
+                 active={pathname ? pathname.includes('/mb/admin/orders') : false}
                  onClick={onClose}
                />
                <SidebarItem 
@@ -139,7 +139,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  icon={Settings} 
                  label="Settings" 
                  path="/mb/admin/settings" 
-                 active={pathname.includes('/mb/admin/settings')}
+                 active={pathname ? pathname.includes('/mb/admin/settings') : false}
                  onClick={onClose}
                />
              </div>
