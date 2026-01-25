@@ -1,0 +1,679 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, addToCart, setError } from '@/store';
+import { 
+  Play, Pause, Download, ShoppingCart, Check, ArrowLeft, Calendar, 
+  HardDrive, Star, MessageSquare, ThumbsUp, User, Trash2, Edit2, X, 
+  Save, Mail, ShieldCheck, Image as ImageIcon, Loader, Volume2, 
+  VolumeX, Share2, Info 
+} from 'lucide-react';
+import Link from 'next/link';
+import { Product } from '@/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DetailSkeleton } from '@/components/ui/Skeleton';
+import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '@/firebase';
+import { sendEmailVerification } from 'firebase/auth';
+
+// --- Sub-components ---
+
+const StarRating = ({ rating, size = "w-4 h-4" }: { rating: number, size?: string }) => {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star 
+          key={star} 
+          className={`${size} ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 dark:fill-zinc-800 text-gray-200 dark:text-zinc-800'}`} 
+        />
+      ))}
+    </div>
+  );
+};
+
+interface Review {
+  id: string; 
+  userId: string;
+  user: string;
+  rating: number;
+  date: string;
+  content: string;
+  avatar: string;
+  likes: number;
+  isLiked?: boolean;
+}
+
+const ReviewItem: React.FC<{ 
+    review: Review; 
+    currentUser: any; 
+    onLike: (id: string) => void; 
+    onDelete: (id: string) => void; 
+    onUpdate: (id: string, content: string) => void;
+}> = ({ review, currentUser, onLike, onDelete, onUpdate }) => {
+    const [userData, setUserData] = useState({ name: review.user, avatar: review.avatar });
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(review.content);
+
+    useEffect(() => {
+        if (!review.userId) return;
+        const unsub = onSnapshot(doc(db, "users", review.userId), (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                setUserData({
+                    name: data.name || review.user,
+                    avatar: data.avatar || review.avatar
+                });
+            }
+        });
+        return () => unsub();
+    }, [review.userId, review.user, review.avatar]);
+
+    const handleSave = () => {
+        onUpdate(review.id, editContent);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className="bg-gray-50 dark:bg-zinc-900/50 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800 hover:border-rose-200 dark:hover:border-zinc-700 transition-colors">
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-4">
+                    <img src={userData.avatar} alt={userData.name} className="w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-zinc-800" />
+                    <div>
+                        <div className="font-bold text-sm text-gray-900 dark:text-white">{userData.name}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <StarRating rating={review.rating} size="w-3 h-3" />
+                            <span className="text-xs text-gray-400">{review.date}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => onLike(review.id)}
+                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${review.isLiked ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}
+                    >
+                        <ThumbsUp className={`w-3 h-3 ${review.isLiked ? 'fill-current' : ''}`} /> {review.likes}
+                    </button>
+
+                    {currentUser && currentUser.id === review.userId && !isEditing && (
+                        <div className="flex items-center gap-1 border-l border-gray-200 dark:border-zinc-700 pl-2">
+                            <button onClick={() => setIsEditing(true)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors"><Edit2 className="w-3 h-3" /></button>
+                            <button onClick={() => onDelete(review.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {isEditing ? (
+                <div className="space-y-3">
+                    <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full bg-white dark:bg-black border border-rose-500 rounded-lg p-3 text-sm outline-none min-h-[80px] focus:ring-1 focus:ring-rose-500" />
+                    <div className="flex gap-2 justify-end">
+                        <button onClick={() => { setIsEditing(false); setEditContent(review.content); }} className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
+                        <button onClick={handleSave} className="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold rounded hover:bg-rose-700 transition-colors flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+                    </div>
+                </div>
+            ) : (
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm whitespace-pre-wrap">"{review.content}"</p>
+            )}
+        </div>
+    );
+};
+
+// --- Main Component ---
+
+const ProductDetailContent: React.FC = () => {
+  const { id } = useParams() as { id: string };
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Reviews State
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [newReview, setNewReview] = useState('');
+  const [userRating, setUserRating] = useState(5);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Audio Player State
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Fetch Product
+  useEffect(() => {
+    const fetchProduct = async () => {
+        if (!id) return;
+        setLoading(true);
+        try {
+            const docRef = doc(db, "products", id);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setProduct({ id: docSnap.id, ...docSnap.data() } as Product);
+            }
+        } catch (error) {
+            console.error("Error fetching product:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchProduct();
+  }, [id]);
+
+  // Fetch Reviews
+  useEffect(() => {
+    if (!id) return;
+    const q = query(collection(db, "products", id, "reviews"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedReviews: Review[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedReviews.push({
+          id: doc.id,
+          userId: data.userId,
+          user: data.user,
+          rating: data.rating,
+          date: new Date(data.createdAt).toLocaleDateString(),
+          content: data.content,
+          avatar: data.avatar,
+          likes: data.likes || 0,
+          isLiked: false
+        });
+      });
+      setReviews(fetchedReviews);
+    });
+    return () => unsubscribe();
+  }, [id]);
+
+  // Audio Handlers
+  const togglePlay = () => {
+    if (audioRef.current) {
+        if (isPlaying) audioRef.current.pause();
+        else audioRef.current.play();
+        setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+        setDuration(audioRef.current.duration || 0);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (audioRef.current) {
+          const time = Number(e.target.value);
+          audioRef.current.currentTime = time;
+          setCurrentTime(time);
+      }
+  };
+
+  const formatTime = (time: number) => {
+      const min = Math.floor(time / 60);
+      const sec = Math.floor(time % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+  };
+
+  const toggleMute = () => {
+      if (audioRef.current) {
+          audioRef.current.muted = !isMuted;
+          setIsMuted(!isMuted);
+      }
+  };
+
+  // Logic Helpers
+  const isFree = product?.price === 0;
+  const features = (product as any)?.features || [];
+
+  const checkAuthAndVerification = async () => {
+    if (!user) {
+        router.push('/login');
+        return false;
+    }
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+        try { await currentUser.reload(); } catch(e) {}
+        if (!currentUser.emailVerified) {
+            try {
+                await sendEmailVerification(currentUser);
+                dispatch(setError(`Account not verified. A verification link has been sent to ${currentUser.email}.`));
+            } catch (error: any) {
+                 dispatch(setError(error.message));
+            }
+            return false;
+        }
+    } else {
+         dispatch(setError("Session invalid. Please log in again."));
+         router.push('/login');
+         return false;
+    }
+    return true;
+  };
+
+  const handleAddToCart = async (product: Product) => {
+      const allowed = await checkAuthAndVerification();
+      if (allowed) dispatch(addToCart(product));
+  };
+
+  const handleDownload = async (isDemo: boolean = false) => {
+      const allowed = await checkAuthAndVerification();
+      if (!allowed) return;
+
+      setIsDownloading(true);
+      try {
+          // Record free order if not demo
+          if (!isDemo && isFree && user && product) {
+               await addDoc(collection(db, "orders"), {
+                  userId: user.id,
+                  userEmail: user.email,
+                  items: [{...product, quantity: 1}],
+                  total: 0,
+                  status: 'Completed',
+                  createdAt: new Date().toISOString()
+              });
+          }
+          
+          if (!isDemo && product?.productUrl) {
+              window.open(product.productUrl, '_blank');
+              setIsDownloading(false);
+              return;
+          }
+
+          const element = document.createElement("a");
+          const fileName = isDemo ? `${product?.name}_Demo.txt` : `${product?.name}_License.txt`;
+          const fileContent = isDemo 
+            ? `This is a demo placeholder for ${product?.name}.` 
+            : `Thank you for downloading ${product?.name} from A.S Studio!\n\nProduct: ${product?.name}\nDownload Link: ${product?.productUrl || 'No link provided'}`;
+          
+          const file = new Blob([fileContent], {type: 'text/plain'});
+          element.href = URL.createObjectURL(file);
+          element.download = fileName;
+          document.body.appendChild(element);
+          element.click();
+          document.body.removeChild(element);
+
+      } catch (error) {
+          console.error("Download failed:", error);
+          dispatch(setError("Failed to process download."));
+      } finally {
+          setIsDownloading(false);
+      }
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReview.trim() || !user || !id) return;
+    setIsSubmittingReview(true);
+    try {
+        await addDoc(collection(db, "products", id, "reviews"), {
+            userId: user.id,
+            user: user.name,
+            rating: userRating,
+            content: newReview,
+            avatar: user.avatar,
+            createdAt: new Date().toISOString(),
+            likes: 0
+        });
+        setNewReview('');
+    } catch (error) {
+        console.error("Error submitting review:", error);
+    } finally {
+        setIsSubmittingReview(false);
+    }
+  };
+
+  const handleLike = (reviewId: string) => {
+    setReviews(reviews.map(review => review.id === reviewId ? { ...review, isLiked: !review.isLiked, likes: review.isLiked ? review.likes - 1 : review.likes + 1 } : review));
+  };
+
+  const handleDelete = async (reviewId: string) => {
+    if (window.confirm('Delete review?')) {
+      await deleteDoc(doc(db, "products", id!, "reviews", reviewId));
+    }
+  };
+
+  const handleUpdate = async (reviewId: string, content: string) => {
+    await updateDoc(doc(db, "products", id!, "reviews", reviewId), { content });
+  };
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareData = {
+        title: product?.name || 'A.S Studio',
+        text: `Check out ${product?.name} on A.S Studio!`,
+        url: shareUrl
+    };
+
+    const copyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (clipboardErr) {
+             console.error('Clipboard copy failed:', clipboardErr);
+        }
+    };
+
+    if (navigator.share) {
+        try {
+            if (navigator.canShare && !navigator.canShare(shareData)) {
+                 await copyToClipboard();
+                 return;
+            }
+            await navigator.share(shareData);
+        } catch (err: any) {
+            if (err.name === 'AbortError') return;
+            await copyToClipboard();
+        }
+    } else {
+        await copyToClipboard();
+    }
+  };
+
+  if (loading || !product) return <DetailSkeleton />;
+
+  return (
+    <div className="min-h-screen py-12 px-4 max-w-7xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white transition-colors duration-300">
+      
+      {/* Back Link */}
+      <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }}>
+        <Link href="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">
+            <div className="p-1 rounded-full bg-gray-100 dark:bg-zinc-900 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/20">
+               <ArrowLeft className="w-4 h-4" />
+            </div>
+            Back to Catalog
+        </Link>
+      </motion.div>
+      
+      {/* Product Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
+        
+        {/* --- LEFT: Image & Audio --- */}
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl"
+        >
+           {/* Product Image */}
+           <div className="aspect-square relative">
+               {product.image ? (
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+               ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700">
+                     <ImageIcon className="w-24 h-24 opacity-50" />
+                  </div>
+               )}
+               {/* Gradient Overlay */}
+               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+           </div>
+           
+           {/* Audio Player Component */}
+           {product.demoUrl && (
+               <div className="absolute bottom-6 left-6 right-6">
+                  <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-4 rounded-xl flex items-center gap-4 border border-gray-200 dark:border-zinc-800 shadow-lg">
+                     
+                     <audio 
+                        ref={audioRef} 
+                        src={product.demoUrl} 
+                        onTimeUpdate={handleTimeUpdate}
+                        onEnded={() => setIsPlaying(false)}
+                     />
+
+                     <button 
+                        onClick={togglePlay}
+                        className="w-12 h-12 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-700 hover:scale-105 transition-all flex-shrink-0 shadow-lg shadow-rose-600/30"
+                     >
+                        {isPlaying ? <Pause className="fill-current w-5 h-5" /> : <Play className="fill-current ml-1 w-5 h-5" />}
+                     </button>
+                     
+                     <div className="flex-1 flex flex-col gap-1.5">
+                         {/* Progress Bar */}
+                        <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden relative group cursor-pointer">
+                           <div className="absolute inset-0 w-full h-full"></div>
+                           <div 
+                              className="h-full bg-rose-600 relative z-10 rounded-full" 
+                              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                           ></div>
+                           <input 
+                              type="range" 
+                              min="0" 
+                              max={duration || 0} 
+                              value={currentTime} 
+                              onChange={handleSeek}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                           />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-bold text-gray-400 font-mono">
+                           <span>{formatTime(currentTime)}</span>
+                           <span>{formatTime(duration)}</span>
+                        </div>
+                     </div>
+
+                     <button onClick={toggleMute} className="text-gray-400 hover:text-rose-600 transition-colors">
+                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                     </button>
+                  </div>
+               </div>
+           )}
+        </motion.div>
+
+        {/* --- RIGHT: Product Info --- */}
+        <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="flex flex-col justify-center">
+           
+           {/* Badges & Meta */}
+           <div className="mb-4 flex items-center justify-between">
+              <span className="inline-block px-3 py-1 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-500 font-bold text-xs rounded-full uppercase tracking-wider border border-rose-100 dark:border-rose-900/20">
+                  {product.category || 'Product'}
+              </span>
+              <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
+                  <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5" /> {product.size || 'N/A'}</span>
+                  <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {product.uploadDate || 'Recent'}</span>
+              </div>
+           </div>
+           
+           <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 leading-tight text-gray-900 dark:text-white">
+             {product.name}
+           </h1>
+           
+           {/* Reviews Summary & Share */}
+           <div className="flex items-center justify-between mb-8 pb-8 border-b border-gray-100 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                  <StarRating rating={product.rating || 5} size="w-5 h-5" />
+                  <span className="text-gray-500 text-sm font-medium hover:text-rose-600 cursor-pointer transition-colors underline decoration-dotted">
+                    {reviews.length} reviews
+                  </span>
+                  <div className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-700"></div>
+                  <span className="text-gray-900 dark:text-white text-sm font-bold flex items-center gap-1">
+                     <Check className="w-4 h-4 text-green-500" /> {product.sales || 0} Sold
+                  </span>
+              </div>
+              <button 
+                  onClick={handleShare}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 hover:text-rose-600 transition-colors"
+                  title="Share"
+              >
+                  {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+              </button>
+           </div>
+
+           {/* Price */}
+           <div className="mb-8">
+               <p className="text-4xl font-mono font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  {isFree ? (
+                      <span className="text-green-600 dark:text-green-500">FREE</span>
+                  ) : (
+                      <>
+                        <span>₦{product.price}</span>
+                        {product.price > 0 && <span className="text-lg text-gray-400 line-through decoration-rose-500/50">₦{Math.round(product.price * 1.5)}</span>}
+                      </>
+                  )}
+               </p>
+           </div>
+           
+           {/* Description */}
+           <div 
+             className="text-gray-600 dark:text-gray-300 mb-8 text-base leading-relaxed whitespace-pre-wrap"
+             dangerouslySetInnerHTML={{ __html: product.description }} 
+           />
+
+           {/* Features List */}
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {features.map((feat: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                   <div className="w-5 h-5 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center shrink-0">
+                      <Check className="w-3 h-3 text-green-600 dark:text-green-500" /> 
+                   </div>
+                   {feat}
+                </div>
+              ))}
+           </div>
+
+           {/* Action Buttons */}
+           <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              {isFree ? (
+                  <button 
+                    onClick={() => handleDownload(false)}
+                    disabled={isDownloading}
+                    className="flex-1 py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 disabled:opacity-70 active:scale-95"
+                  >
+                     {isDownloading ? <Loader className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />} 
+                     Download Now
+                  </button>
+              ) : (
+                  <>
+                      <button 
+                        onClick={() => handleAddToCart(product)}
+                        className="flex-[2] py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 active:scale-95"
+                      >
+                         <ShoppingCart className="w-5 h-5" /> Add To Cart
+                      </button>
+                      <button 
+                        onClick={() => handleDownload(true)}
+                        disabled={isDownloading}
+                        className="flex-1 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-rose-500 hover:text-rose-600 dark:hover:border-rose-500 dark:hover:text-rose-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                         {isDownloading ? <Loader className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />} 
+                         Demo
+                      </button>
+                  </>
+              )}
+           </div>
+
+           {/* Delivery Note */}
+           <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-4 border border-blue-100 dark:border-blue-900/20 flex gap-3">
+                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div>
+                    <h3 className="font-bold text-sm text-blue-900 dark:text-blue-300 mb-1">Instant Delivery</h3>
+                    <p className="text-xs text-blue-700 dark:text-blue-400/80 leading-relaxed">
+                        Files are delivered automatically to your email immediately after purchase. Secure download links expire after 24 hours.
+                    </p>
+                </div>
+           </div>
+        </motion.div>
+      </div>
+
+      {/* --- REVIEWS SECTION --- */}
+      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} className="border-t border-gray-100 dark:border-zinc-800 pt-16">
+        <div className="flex flex-col md:flex-row gap-12">
+           
+           {/* Sidebar: Summary & Form */}
+           <div className="w-full md:w-1/3 space-y-8">
+              <div>
+                 <h2 className="text-2xl font-black mb-4">Customer Reviews</h2>
+                 <div className="flex items-center gap-4 mb-2">
+                    <span className="text-6xl font-black text-gray-900 dark:text-white">{product.rating || 5.0}</span>
+                    <div className="space-y-1">
+                       <StarRating rating={product.rating || 5} size="w-5 h-5" />
+                       <p className="text-gray-500 text-sm font-medium">Based on {reviews.length} reviews</p>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-zinc-900 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800">
+                 <h3 className="font-bold mb-4 text-gray-900 dark:text-white">Write a Review</h3>
+                 {user ? (
+                   <form onSubmit={handleSubmitReview} className="space-y-4">
+                      <div>
+                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Your Rating</label>
+                         <div className="flex gap-2">
+                            {[1,2,3,4,5].map(star => (
+                               <button type="button" key={star} onClick={() => setUserRating(star)} className="focus:outline-none transition-transform hover:scale-110">
+                                  <Star className={`w-8 h-8 ${star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-zinc-700'}`} />
+                               </button>
+                            ))}
+                         </div>
+                      </div>
+                      <div>
+                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Your Feedback</label>
+                         <textarea 
+                            value={newReview} 
+                            onChange={(e) => setNewReview(e.target.value)} 
+                            className="w-full bg-white dark:bg-black border border-gray-200 dark:border-zinc-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none min-h-[100px] transition-all" 
+                            placeholder="Share your thoughts on this pack..."
+                         ></textarea>
+                      </div>
+                      <button disabled={isSubmittingReview} className="w-full py-3 bg-black dark:bg-white text-white dark:text-black font-bold rounded-xl hover:opacity-80 transition-opacity disabled:opacity-50">
+                         {isSubmittingReview ? 'Posting...' : 'Post Review'}
+                      </button>
+                   </form>
+                 ) : (
+                    <div className="text-center py-8 px-4 space-y-4">
+                       <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-zinc-800 flex items-center justify-center mx-auto">
+                           <User className="w-6 h-6 text-gray-500" />
+                       </div>
+                       <p className="text-sm text-gray-600 dark:text-gray-400">Please log in to share your experience with the community.</p>
+                       <Link href="/login" className="block w-full py-3 bg-rose-600 text-white font-bold rounded-xl text-center hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20">Log In Now</Link>
+                    </div>
+                 )}
+              </div>
+           </div>
+           
+           {/* Reviews List */}
+           <div className="flex-1 space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white">Recent Comments</h3>
+                  <div className="text-sm text-gray-500">Sorted by Newest</div>
+              </div>
+
+              <AnimatePresence>
+                {reviews.map((review) => (
+                    <motion.div 
+                        key={review.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                    >
+                        <ReviewItem 
+                            review={review} 
+                            currentUser={user} 
+                            onLike={handleLike} 
+                            onDelete={handleDelete} 
+                            onUpdate={handleUpdate} 
+                        />
+                    </motion.div>
+                ))}
+              </AnimatePresence>
+              
+              {reviews.length === 0 && (
+                 <div className="text-center py-20 border-2 border-dashed border-gray-100 dark:border-zinc-800 rounded-2xl">
+                    <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-zinc-700" />
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white">No reviews yet</h4>
+                    <p className="text-gray-500">Be the first to share your thoughts on this product!</p>
+                 </div>
+              )}
+           </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default ProductDetailContent;
