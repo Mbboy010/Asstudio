@@ -8,14 +8,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState, logout, toggleCart, setError } from '../store';
 import { ShoppingBag, User as UserIcon, Sun, Moon, Search, Menu, X, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sendEmailVerification } from 'firebase/auth';
-import { auth, db } from '../firebase'; // Ensure db is exported from your firebase config
+import { sendEmailVerification, AuthError } from 'firebase/auth'; // Added AuthError type
+import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useTheme } from 'next-themes';
 
 interface AuthUser {
   uid?: string;
-  id?: string; // Some systems use 'id' instead of 'uid'
+  id?: string;
   email?: string | null;
   displayName?: string | null;
   avatar?: string | null;
@@ -44,10 +44,8 @@ export const Navbar: React.FC = () => {
     setMounted(true);
   }, []);
 
-  // --- Logic to Save Cart to Firestore ---
   useEffect(() => {
     const saveCartToDb = async () => {
-      // Use user.uid or user.id depending on your Redux structure
       const userId = user?.uid || user?.id;
       
       if (isAuthenticated && userId) {
@@ -63,7 +61,6 @@ export const Navbar: React.FC = () => {
       }
     };
 
-    // Debounce or simply trigger on item change
     if (mounted) {
       saveCartToDb();
     }
@@ -92,8 +89,10 @@ export const Navbar: React.FC = () => {
             try {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. Verification link sent to ${currentUser.email}.`));
-            } catch (error: any) {
-                dispatch(setError(error.code === 'auth/too-many-requests' ? "Check your inbox." : "Failed to send email."));
+            } catch (error: unknown) {
+                // FIX: Replaced 'any' with 'AuthError' type check
+                const authErr = error as AuthError;
+                dispatch(setError(authErr.code === 'auth/too-many-requests' ? "Check your inbox." : "Failed to send email."));
             }
             return;
         }
@@ -111,7 +110,6 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-10 h-10 flex items-center justify-center bg-black dark:bg-zinc-900 rounded-lg overflow-hidden border border-rose-500/30 group-hover:border-rose-500 transition-colors">
@@ -124,7 +122,6 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
 
-          {/* Desktop Nav */}
           <div className="hidden md:flex items-center space-x-8">
             {[{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }].map((link) => (
               <Link 
@@ -147,7 +144,6 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Right Icons */}
           <div className="hidden md:flex items-center gap-3">
             <div className={`relative flex items-center transition-all duration-300 ${isSearchOpen ? 'w-64' : 'w-10'}`}>
                {isSearchOpen && (
@@ -199,7 +195,6 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile UI Buttons */}
           <div className="flex md:hidden items-center gap-4">
              <button onClick={handleCartClick} className="relative p-2 text-gray-900 dark:text-white">
               <ShoppingBag className="w-6 h-6" />
@@ -212,7 +207,6 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200 dark:border-zinc-800">
