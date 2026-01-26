@@ -112,7 +112,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       <Navbar />
 
-      <main className="flex-grow pt-16">
+      <main className="flex-grow">
         {children}
       </main>
 
