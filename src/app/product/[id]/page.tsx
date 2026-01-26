@@ -87,7 +87,7 @@ const ReviewItem: React.FC<{
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
                     <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-zinc-800">
-                        <img 
+                        <Image 
                           src={userData.avatar || '/placeholder-avatar.png'} 
                           alt={userData.name} 
                           fill 
@@ -401,7 +401,7 @@ const ProductDetail: React.FC = () => {
         <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl">
            <div className="aspect-square relative">
                {product.image ? (
-                  <img src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
+                  <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
                ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700">
                      <ImageIcon className="w-24 h-24 opacity-50" />
