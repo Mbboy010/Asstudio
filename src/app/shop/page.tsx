@@ -8,7 +8,7 @@ import { ProductSkeleton } from '@/components/ui/Skeleton';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, setError, RootState } from '@/store';
 import Link from 'next/link';
-import Image from 'next/image';
+// Note: You can remove the 'import Image from "next/image"' if you aren't using it elsewhere
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
@@ -32,7 +32,6 @@ const getCookie = (name: string) => {
   return '';
 };
 
-// Internal content component to safely use searchParams
 const ShopContent: React.FC = () => {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -41,7 +40,6 @@ const ShopContent: React.FC = () => {
   
   const [loading, setLoading] = useState(true);
   
-  // Fixed: Added optional chaining (?.) and null coalescing (??) to satisfy TypeScript
   const selectedCategory = searchParams?.get('category') ?? 'All';
   const urlSearchTerm = searchParams?.get('search') ?? '';
   
@@ -232,7 +230,7 @@ const ShopContent: React.FC = () => {
          viewport={{ once: false }}
          className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8 border-b border-gray-200 dark:border-zinc-800 pb-8"
       >
-        <div>
+        <div className="w-full text-left">
            <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-2 uppercase">Explore Sounds</h1>
            <p className="text-gray-500 font-medium">Over {products.length}+ premium tools available.</p>
         </div>
@@ -283,12 +281,11 @@ const ShopContent: React.FC = () => {
             >
               <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
-                   <Image 
+                   /* UPDATED: Changed from Next.js Image to standard img tag */
+                   <img 
                     src={product.image} 
                     alt={product.name} 
-                    fill 
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                    className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                    />
                 ) : (
                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
@@ -409,7 +406,6 @@ const ShopContent: React.FC = () => {
   );
 };
 
-// Main component with Suspense wrapper to prevent Next.js 15 build errors
 export default function Shop() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>}>
