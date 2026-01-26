@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import React, { useState, useEffect, useCallback, Suspense } from 'react'; 
 import { motion } from 'framer-motion';
 import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter } from 'lucide-react';
 import { Product, ProductCategory } from '@/types';
@@ -8,7 +8,7 @@ import { ProductSkeleton } from '@/components/ui/Skeleton';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, setError, RootState } from '@/store';
 import Link from 'next/link';
-import Image from 'next/image'; // Added Next.js Image
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
@@ -32,6 +32,7 @@ const getCookie = (name: string) => {
   return '';
 };
 
+// Internal content component to safely use searchParams
 const ShopContent: React.FC = () => {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -39,8 +40,11 @@ const ShopContent: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   
   const [loading, setLoading] = useState(true);
-  const selectedCategory = searchParams.get('category') || 'All';
-  const urlSearchTerm = searchParams.get('search') || '';
+  
+  // Fixed: Added optional chaining (?.) and null coalescing (??) to satisfy TypeScript
+  const selectedCategory = searchParams?.get('category') ?? 'All';
+  const urlSearchTerm = searchParams?.get('search') ?? '';
+  
   const [localSearchTerm, setLocalSearchTerm] = useState(urlSearchTerm);
   const [products, setProducts] = useState<Product[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -48,7 +52,7 @@ const ShopContent: React.FC = () => {
 
   useEffect(() => {
     const cookieSearch = getCookie('asstudio_search');
-    const urlSearch = searchParams.get('search');
+    const urlSearch = searchParams?.get('search');
 
     if (urlSearch) {
         if (urlSearch !== cookieSearch) {
@@ -56,7 +60,7 @@ const ShopContent: React.FC = () => {
         }
     } else if (cookieSearch) {
         setLocalSearchTerm(cookieSearch);
-        const params = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams?.toString() ?? '');
         params.set('search', cookieSearch);
         router.replace(`/shop?${params.toString()}`);
     }
@@ -69,7 +73,7 @@ const ShopContent: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearchTerm !== urlSearchTerm) {
-        const params = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams?.toString() ?? '');
         if (localSearchTerm) {
           params.set('search', localSearchTerm);
           setCookie('asstudio_search', localSearchTerm, 30);
@@ -83,18 +87,17 @@ const ShopContent: React.FC = () => {
     return () => clearTimeout(timer);
   }, [localSearchTerm, searchParams, router, urlSearchTerm]);
 
-  // Wrapped in useCallback to fix the missing dependency warning
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const q = query(collection(db, "products"), orderBy("uploadDate", "desc"));
       const querySnapshot = await getDocs(q);
       const fetchedProducts: Product[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedProducts.push({ id: doc.id, ...doc.data() } as Product);
+      querySnapshot.forEach((docSnap) => {
+        fetchedProducts.push({ id: docSnap.id, ...docSnap.data() } as Product);
       });
       setProducts(fetchedProducts);
-    } catch (error: unknown) { // Fixed "any"
+    } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       console.error("Error fetching products: ", err);
       if (err.code === 'permission-denied' || err.message?.includes('disabled')) {
@@ -125,7 +128,7 @@ const ShopContent: React.FC = () => {
             try {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. A link has been sent to ${currentUser.email}.`));
-            } catch (error: unknown) { // Fixed "any"
+            } catch (error: unknown) {
                  const err = error as { code?: string; message?: string };
                  if (err.code === 'auth/too-many-requests') {
                      dispatch(setError("Verification email already sent. Check your inbox."));
@@ -157,8 +160,8 @@ const ShopContent: React.FC = () => {
     setDownloadingId(product.id);
     try {
         await addDoc(collection(db, "orders"), {
-            userId: user!.id,
-            userEmail: user!.email,
+            userId: user?.id,
+            userEmail: user?.email,
             items: [{...product, quantity: 1}],
             total: 0,
             status: 'Completed',
@@ -174,7 +177,7 @@ const ShopContent: React.FC = () => {
         element.click();
         document.body.removeChild(element);
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("Download error:", error);
         dispatch(setError("Failed to process download."));
     } finally {
@@ -183,7 +186,7 @@ const ShopContent: React.FC = () => {
   };
 
   const handleCategoryChange = (cat: string) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
       if (cat === 'All') {
           params.delete('category');
       } else {
@@ -284,6 +287,7 @@ const ShopContent: React.FC = () => {
                     src={product.image} 
                     alt={product.name} 
                     fill 
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-700" 
                    />
                 ) : (
@@ -405,4 +409,11 @@ const ShopContent: React.FC = () => {
   );
 };
 
-export default ShopContent;
+// Main component with Suspense wrapper to prevent Next.js 15 build errors
+export default function Shop() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>}>
+      <ShopContent />
+    </Suspense>
+  );
+}
