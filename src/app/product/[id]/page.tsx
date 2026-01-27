@@ -11,7 +11,7 @@ import {
   VolumeX, Share2, Info, Save
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image'; 
+// Removed: import Image from 'next/image'; 
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DetailSkeleton } from '@/components/ui/Skeleton';
@@ -87,11 +87,11 @@ const ReviewItem: React.FC<{
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
                     <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-zinc-800">
-                        <Image 
+                        {/* UPDATE 1: Standard img for user avatar */}
+                        <img 
                           src={userData.avatar || '/placeholder-avatar.png'} 
                           alt={userData.name} 
-                          fill 
-                          className="object-cover" 
+                          className="w-full h-full object-cover" 
                         />
                     </div>
                     <div>
@@ -137,7 +137,6 @@ const ReviewItem: React.FC<{
 
 const ProductDetail: React.FC = () => {
   const params = useParams();
-  // FIX: Safely access id from params because it can be null during build
   const id = params?.id as string; 
   
   const router = useRouter();
@@ -239,7 +238,6 @@ const ProductDetail: React.FC = () => {
   };
 
   const isFree = product?.price === 0;
-  const features = (product as (Product & { features?: string[] }))?.features || [];
 
   const checkAuthAndVerification = useCallback(async () => {
     if (!user) {
@@ -400,8 +398,13 @@ const ProductDetail: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl">
            <div className="aspect-square relative">
+               {/* UPDATE 2: Standard img for product main image */}
                {product.image ? (
-                  <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
+                  <img 
+                    src={product.image} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover" 
+                  />
                ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700">
                      <ImageIcon className="w-24 h-24 opacity-50" />
@@ -529,7 +532,6 @@ const ProductDetail: React.FC = () => {
   );
 };
 
-// CRITICAL FIX: Wrap in Suspense for Next.js 15 Build
 export default function ProductDetailContent() {
   return (
     <Suspense fallback={<DetailSkeleton />}>
