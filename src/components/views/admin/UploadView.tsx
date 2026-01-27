@@ -8,6 +8,9 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
+// --- APPWRITE IMPORTS ---
+import { storage, BUCKET_ID, ID } from '@/appwrite'; 
+
 const CROP_SIZE = 400;
 
 const AdminUploadView: React.FC = () => {
@@ -56,6 +59,18 @@ const AdminUploadView: React.FC = () => {
   const productInputRef = useRef<HTMLInputElement>(null);
   const demoInputRef = useRef<HTMLInputElement>(null);
 
+  // --- HELPER: Upload to Appwrite ---
+  const uploadToAppwrite = async (file: File): Promise<string> => {
+    try {
+        const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), file);
+        // Returns the public view URL
+        return storage.getFileView(BUCKET_ID, uploaded.$id).toString(); 
+    } catch (error) {
+        console.error("Appwrite Upload Error:", error);
+        throw error;
+    }
+  };
+
   // --- Handlers for Product File ---
   const handleProductDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -93,7 +108,7 @@ const AdminUploadView: React.FC = () => {
     }
   };
 
-  // --- Crop Logic ---
+  // --- Crop Logic (Keep as is) ---
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -200,7 +215,6 @@ const AdminUploadView: React.FC = () => {
         
         ctx.drawImage(img, cropOffset.x, cropOffset.y, renderedWidth, renderedHeight);
         
-        // Compression Loop to get < 50kb
         let quality = 0.9;
         let dataUrl = await compressImage(canvas, quality);
         
@@ -229,16 +243,23 @@ const AdminUploadView: React.FC = () => {
 
     setIsUploading(true);
     try {
-      const finalProductUrl = productType === 'file' && productFile 
-        ? URL.createObjectURL(productFile) 
-        : productUrl;
+      let finalProductUrl = productUrl;
+      let finalDemoUrl = demoUrl;
 
-      const finalDemoUrl = demoType === 'file' && demoFile 
-        ? URL.createObjectURL(demoFile) 
-        : demoUrl;
+      // 1. Upload Product File to Appwrite if selected
+      if (productType === 'file' && productFile) {
+        finalProductUrl = await uploadToAppwrite(productFile);
+      }
+
+      // 2. Upload Demo Audio to Appwrite if selected
+      if (demoType === 'file' && demoFile) {
+        finalDemoUrl = await uploadToAppwrite(demoFile);
+      }
       
+      // Image remains as Base64/Local Preview
       const finalCoverUrl = coverPreview;
 
+      // 3. Save to Firestore
       await addDoc(collection(db, "products"), {
         name: formData.name,
         category: formData.category,
@@ -258,6 +279,7 @@ const AdminUploadView: React.FC = () => {
 
       alert("Product successfully published!");
       
+      // Reset State
       setProductFile(null); setProductUrl('');
       setDemoFile(null); setDemoUrl('');
       setCoverPreview(null);
@@ -269,12 +291,13 @@ const AdminUploadView: React.FC = () => {
 
     } catch (error) {
       console.error("Error uploading product:", error);
-      alert("Failed to upload product. Please try again.");
+      alert("Failed to upload. Please ensure your Appwrite bucket allows these file types.");
     } finally {
       setIsUploading(false);
     }
   };
 
+  // --- RENDER (Keep your existing JSX) ---
   return (
     <div className="bg-gray-50 dark:bg-black min-h-screen py-6 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -596,7 +619,7 @@ const AdminUploadView: React.FC = () => {
             </div>
         </form>
 
-      {/* Crop Modal */}
+      {/* Crop Modal (Keep as is) */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <motion.div 
@@ -619,7 +642,6 @@ const AdminUploadView: React.FC = () => {
                     </div>
 
                     <div className="relative w-full flex justify-center mb-6 overflow-hidden bg-gray-100 dark:bg-black rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700">
-                        {/* Crop Area */}
                         <div 
                             className="relative overflow-hidden rounded-lg shadow-[0_0_0_100px_rgba(255,255,255,0.9)] dark:shadow-[0_0_0_100px_rgba(0,0,0,0.8)] cursor-move touch-none"
                             style={{ width: CROP_SIZE, height: CROP_SIZE }}
@@ -683,7 +705,6 @@ const AdminUploadView: React.FC = () => {
         )}
       </AnimatePresence>
     </div>
-  </div>
   );
 };
 
