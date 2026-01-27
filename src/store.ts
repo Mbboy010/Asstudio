@@ -90,9 +90,14 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState: initialCartState,
   reducers: {
+    // 1. THIS IS NEW: Used to load cart from Database
+    setCart: (state, action: PayloadAction<CartItem[]>) => {
+      state.items = action.payload;
+    },
     addToCart: (state, action: PayloadAction<Product>) => {
       const existing = state.items.find(i => i.id === action.payload.id);
       if (existing) {
+        // This prevents duplicates (Double Money issue)
         existing.quantity += 1;
       } else {
         state.items.push({ ...action.payload, quantity: 1 });
@@ -111,7 +116,8 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addToCart, removeFromCart, toggleCart, clearCart } = cartSlice.actions;
+// Export setCart here
+export const { addToCart, removeFromCart, toggleCart, clearCart, setCart } = cartSlice.actions;
 
 // --- Store ---
 export const store = configureStore({
