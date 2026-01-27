@@ -5,12 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, logout, toggleCart, setError } from '../store';
+// Make sure to export 'setCart' from your store/cartSlice
+import { RootState, logout, toggleCart, setError, setCart } from '../store';
 import { ShoppingBag, User as UserIcon, Sun, Moon, Search, Menu, X, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sendEmailVerification, AuthError } from 'firebase/auth'; // Added AuthError type
+import { sendEmailVerification, AuthError } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore'; // Added getDoc
 import { useTheme } from 'next-themes';
 
 interface AuthUser {
@@ -37,6 +38,9 @@ export const Navbar: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  
+  // New State: prevents saving empty cart to DB on initial page load
+  const [isCartLoaded, setIsCartLoaded] = useState(false); 
 
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -44,15 +48,55 @@ export const Navbar: React.FC = () => {
     setMounted(true);
   }, []);
 
+  // 1. LOAD CART FROM DB ON LOGIN / REFRESH
+  useEffect(() => {
+    const loadCartFromDb = async () => {
+      const userId = user?.uid || user?.id;
+      if (isAuthenticated && userId) {
+        try {
+          const cartRef = doc(db, 'carts', userId);
+          const docSnap = await getDoc(cartRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            // Dispatch action to update Redux with DB data
+            // This ensures when they refresh, they see their old cart
+            if (data.items && data.items.length > 0) {
+               dispatch(setCart(data.items));
+            }
+          }
+        } catch (error) {
+          console.error("Error loading cart:", error);
+        } finally {
+          // Mark as loaded so the Save effect can start working
+          setIsCartLoaded(true);
+        }
+      } else {
+        // If not logged in, we are technically "loaded" with a local cart
+        setIsCartLoaded(true); 
+      }
+    };
+
+    if (mounted) {
+      loadCartFromDb();
+    }
+  }, [isAuthenticated, user, dispatch, mounted]);
+
+  // 2. SAVE CART TO DB (Only if loaded and user is logged in)
   useEffect(() => {
     const saveCartToDb = async () => {
       const userId = user?.uid || user?.id;
       
+      // Crucial Check: !isCartLoaded
+      // We do NOT save if we haven't finished loading from DB yet.
+      // This prevents the empty initial Redux state from wiping the DB.
+      if (!isCartLoaded) return; 
+
       if (isAuthenticated && userId) {
         try {
           const cartRef = doc(db, 'carts', userId);
           await setDoc(cartRef, {
-            items: items,
+            items: items, // This saves the current Redux state
             updatedAt: new Date().toISOString(),
           }, { merge: true });
         } catch (error) {
@@ -61,10 +105,11 @@ export const Navbar: React.FC = () => {
       }
     };
 
+    // Debounce slightly could be good here, but direct effect is fine for now
     if (mounted) {
       saveCartToDb();
     }
-  }, [items, user, isAuthenticated, mounted]);
+  }, [items, user, isAuthenticated, mounted, isCartLoaded]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -72,6 +117,8 @@ export const Navbar: React.FC = () => {
 
   const handleLogout = () => {
     dispatch(logout());
+    // Optional: Clear cart on logout
+    // dispatch(setCart([])); 
     router.push('/');
   };
 
@@ -90,7 +137,6 @@ export const Navbar: React.FC = () => {
                 await sendEmailVerification(currentUser);
                 dispatch(setError(`Account not verified. Verification link sent to ${currentUser.email}.`));
             } catch (error: unknown) {
-                // FIX: Replaced 'any' with 'AuthError' type check
                 const authErr = error as AuthError;
                 dispatch(setError(authErr.code === 'auth/too-many-requests' ? "Check your inbox." : "Failed to send email."));
             }
