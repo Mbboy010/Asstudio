@@ -705,6 +705,7 @@ const AdminUploadView: React.FC = () => {
         )}
       </AnimatePresence>
     </div>
+    </div>
   );
 };
 
