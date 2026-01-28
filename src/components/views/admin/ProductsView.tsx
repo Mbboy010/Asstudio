@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Plus, Edit2, Trash2, Image as ImageIcon, Search, X, Upload, Save, 
-  FileAudio, Check, Monitor, Smartphone, Zap, Layers, HardDrive, Calendar, 
-  Star, Loader, Music, Link as LinkIcon, ZoomIn, ZoomOut, Filter
+  Plus, Image as ImageIcon, X, Upload, Save, 
+  Music, Loader, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { ProductCategory, Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,23 +12,19 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy 
 import { db } from '@/firebase';
 
 // --- Appwrite Imports ---
-import { storage, BUCKET_ID, ID } from '@/appwrite'; // Ensure your appwrite config exports these
+import { storage, BUCKET_ID, ID } from '@/appwrite'; 
 
 const CROP_SIZE = 400;
 
 const AdminProductsView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Local File States (for Appwrite)
   const [productFile, setProductFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
 
-  // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
@@ -46,7 +41,6 @@ const AdminProductsView: React.FC = () => {
     downloadType: 'file'
   });
 
-  // Crop State
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [cropImgSrc, setCropImgSrc] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
@@ -60,13 +54,10 @@ const AdminProductsView: React.FC = () => {
   const cropImgRef = useRef<HTMLImageElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Appwrite Upload Helper ---
   const uploadToAppwrite = async (file: File) => {
     try {
       const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-      // Get the file view/download URL
       const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
       return fileUrl.toString();
     } catch (error) {
@@ -94,14 +85,6 @@ const AdminProductsView: React.FC = () => {
 
   useEffect(() => { fetchProducts(); }, []);
 
-  const handleEdit = (product: Product) => {
-    setEditingId(product.id);
-    setFormData(product);
-    setProductFile(null);
-    setAudioFile(null);
-    setIsModalOpen(true);
-  };
-
   const handleAdd = () => {
     setEditingId(null);
     setProductFile(null);
@@ -123,16 +106,6 @@ const AdminProductsView: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Delete this product?')) {
-      try {
-        await deleteDoc(doc(db, "products", id));
-        setProducts(products.filter(p => p.id !== id));
-      } catch (error) { console.error(error); }
-    }
-  };
-
-  // --- Image Handling & Crop (Logic Remains same as your request) ---
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -191,7 +164,6 @@ const AdminProductsView: React.FC = () => {
       } finally { setIsProcessingCrop(false); }
   };
 
-  // --- Final Save to Database ---
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -199,12 +171,10 @@ const AdminProductsView: React.FC = () => {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
 
-      // 1. Upload Product File if exists
       if (productFile && formData.downloadType === 'file') {
         finalProductUrl = await uploadToAppwrite(productFile);
       }
 
-      // 2. Upload Audio File if exists
       if (audioFile) {
         finalDemoUrl = await uploadToAppwrite(audioFile);
       }
@@ -231,7 +201,6 @@ const AdminProductsView: React.FC = () => {
 
   return (
     <div className="space-y-8 bg-gray-50 dark:bg-black min-h-screen py-6 px-4">
-      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-gray-200 dark:border-zinc-800 pb-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900 dark:text-white">Product Management</h1>
@@ -242,9 +211,8 @@ const AdminProductsView: React.FC = () => {
         </button>
       </div>
 
-      {/* Grid of Products... (keep your existing grid code) */}
+      {loading && <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>}
 
-      {/* Add/Edit Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -254,33 +222,29 @@ const AdminProductsView: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              {/* STICKY MODAL HEADER */}
               <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-20">
                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">{editingId ? 'Edit Product' : 'New Product'}</h2>
                  <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
 
-              {/* SCROLLABLE FORM BODY */}
-              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6">
                   <form onSubmit={handleSave} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Left Side: Media */}
                       <div className="space-y-6">
                          <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cover Art</label>
                             <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-300 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800/50 group">
                                <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageInput} />
-                               {formData.image ? <img src={formData.image} alt="Crop" className="w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
+                               {formData.image ? <img src={formData.image} alt="Product" className="w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold transition-opacity">Change Image</div>
                             </div>
                          </div>
 
-                         {/* File Selection */}
                          <div className="bg-gray-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                             <div className="flex items-center justify-between">
                                <span className="font-bold text-sm">Product File (Appwrite)</span>
                                <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-lg">
-                                  <button type="button" onClick={() => setFormData({...formData, downloadType: 'file'})} className={`px-3 py-1 text-xs rounded-md font-bold transition-all ${formData.downloadType === 'file' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500'}`}>File</button>
+                                  <button type="button" onClick={() => setFormData({...formData, downloadType: 'file'})} className={`px-3 py-1 text-xs rounded-md font-bold transition-all ${formData.downloadType === 'file' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-50'}`}>File</button>
                                   <button type="button" onClick={() => setFormData({...formData, downloadType: 'link'})} className={`px-3 py-1 text-xs rounded-md font-bold transition-all ${formData.downloadType === 'link' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500'}`}>Link</button>
                                </div>
                             </div>
@@ -292,11 +256,10 @@ const AdminProductsView: React.FC = () => {
                                     <span className="text-xs font-bold text-gray-500">{productFile ? productFile.name : 'Select ZIP/RAR file'}</span>
                                 </div>
                             ) : (
-                                <input type="url" placeholder="Direct Download Link" value={formData.productUrl} onChange={e => setFormData({...formData, productUrl: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm" />
+                                <input type="url" placeholder="Direct Download Link" value={formData.productUrl ?? ''} onChange={e => setFormData({...formData, productUrl: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm" />
                             )}
                          </div>
 
-                         {/* Audio Selection */}
                          <div className="bg-gray-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-3">
                             <label className="text-sm font-bold flex items-center gap-2"><Music className="w-4 h-4" /> Audio Demo</label>
                             <input type="file" accept="audio/*" className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
@@ -304,7 +267,6 @@ const AdminProductsView: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Right Side: Details */}
                       <div className="space-y-6">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Product Name</label>
@@ -331,7 +293,6 @@ const AdminProductsView: React.FC = () => {
                   </form>
               </div>
 
-              {/* STICKY MODAL FOOTER */}
               <div className="p-6 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex gap-4 sticky bottom-0 z-20">
                  <button type="button" disabled={isSaving} onClick={() => setIsModalOpen(false)} className="flex-1 py-4 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
                  <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center gap-2">
@@ -344,7 +305,6 @@ const AdminProductsView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* CROP MODAL (Same as your upload page) */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -355,7 +315,7 @@ const AdminProductsView: React.FC = () => {
                     </div>
                     <div className="relative overflow-hidden bg-black rounded-xl mb-6 flex justify-center items-center" style={{ width: '100%', height: CROP_SIZE }}>
                         <div className="relative overflow-hidden shadow-[0_0_0_1000px_rgba(0,0,0,0.5)] cursor-move touch-none" style={{ width: CROP_SIZE, height: CROP_SIZE }} onMouseDown={(e) => { setIsDragging(true); setDragStart({ x: e.clientX - cropOffset.x, y: e.clientY - cropOffset.y }); }} onMouseMove={handleMouseMove} onMouseUp={() => setIsDragging(false)}>
-                            <img ref={cropImgRef} src={cropImgSrc} onLoad={handleImageLoad} draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})` }} />
+                            <img ref={cropImgRef} src={cropImgSrc} onLoad={handleImageLoad} draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})` }} alt="Crop target" />
                         </div>
                     </div>
                     <div className="flex items-center gap-4 mb-6">
