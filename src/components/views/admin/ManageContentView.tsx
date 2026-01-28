@@ -113,14 +113,9 @@ const AdminProductsView: React.FC = () => {
   };
 
   const uploadToAppwrite = async (file: File) => {
-    try {
-      const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-      const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
-      return fileUrl.toString();
-    } catch (error) {
-      console.error("Appwrite upload error:", error);
-      throw error;
-    }
+    const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
+    const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
+    return fileUrl.toString();
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -154,6 +149,7 @@ const AdminProductsView: React.FC = () => {
       fetchProducts();
       setIsModalOpen(false);
     } catch (error) {
+      console.error(error);
       alert("Failed to save product.");
     } finally { setIsSaving(false); }
   };
@@ -228,7 +224,6 @@ const AdminProductsView: React.FC = () => {
         </button>
       </div>
 
-      {/* --- PRODUCT GRID --- */}
       {loading ? (
         <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
       ) : (
@@ -236,7 +231,8 @@ const AdminProductsView: React.FC = () => {
           {products.map((product) => (
             <div key={product.id} className="group bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 overflow-hidden hover:shadow-xl transition-all">
               <div className="aspect-square relative overflow-hidden bg-gray-100 dark:bg-zinc-800">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                {/* FIX: Use fallback for src and provide alt text */}
+                <img src={product.image || ''} alt={product.name || 'Product'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute top-3 right-3 flex gap-2">
                    <button onClick={() => handleEdit(product)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-rose-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
                    <button onClick={() => handleDelete(product.id)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
@@ -261,11 +257,7 @@ const AdminProductsView: React.FC = () => {
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-            
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-            >
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-20">
                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">{editingId ? 'Edit Product' : 'New Product'}</h2>
                  <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-6 h-6" /></button>
@@ -279,7 +271,7 @@ const AdminProductsView: React.FC = () => {
                             <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cover Art</label>
                             <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-300 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800/50 group">
                                <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageInput} />
-                               {formData.image ? <img src={formData.image} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
+                               {formData.image ? <img src={formData.image || ''} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold transition-opacity">Change Image</div>
                             </div>
                          </div>
@@ -330,7 +322,7 @@ const AdminProductsView: React.FC = () => {
                         </div>
                         <div className="space-y-2 flex flex-col">
                           <label className="text-sm font-bold">Description</label>
-                          <RichTextEditor value={formData.description || ''} onChange={(val) => setFormData({...formData, description: val})} className="min-h-[200px] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl" />
+                          <RichTextEditor value={formData.description || ''} onChange={(val) => setFormData({...formData, description: val})} className="min-h-[200px] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl" />
                         </div>
                       </div>
                     </div>
@@ -358,8 +350,15 @@ const AdminProductsView: React.FC = () => {
                         <X onClick={() => setIsCropOpen(false)} className="cursor-pointer text-gray-400" />
                     </div>
                     <div className="relative overflow-hidden bg-black rounded-xl mb-6 flex justify-center items-center" style={{ width: '100%', height: CROP_SIZE }}>
-                        <div className="relative overflow-hidden shadow-[0_0_0_1000px_rgba(0,0,0,0.5)] cursor-move touch-none" style={{ width: CROP_SIZE, height: CROP_SIZE }} onMouseDown={(e) => { setIsDragging(true); setDragStart({ x: e.clientX - cropOffset.x, y: e.clientY - cropOffset.y }); }} onMouseMove={handleMouseMove} onMouseUp={() => setIsDragging(false)}>
-                            <img ref={cropImgRef} src={cropImgSrc} onLoad={handleImageLoad} draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})` }} alt="Image to be cropped" />
+                        <div 
+                          className="relative overflow-hidden shadow-[0_0_0_1000px_rgba(0,0,0,0.5)] cursor-move touch-none" 
+                          style={{ width: CROP_SIZE, height: CROP_SIZE }} 
+                          onMouseDown={(e) => { setIsDragging(true); setDragStart({ x: e.clientX - cropOffset.x, y: e.clientY - cropOffset.y }); }} 
+                          onMouseMove={handleMouseMove} 
+                          onMouseUp={() => setIsDragging(false)}
+                        >
+                            {/* FIX: Use fallback for src and provide alt text */}
+                            <img ref={cropImgRef} src={cropImgSrc || ''} alt="Crop Preview" onLoad={handleImageLoad} draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})` }} />
                         </div>
                     </div>
                     <div className="flex items-center gap-4 mb-6">
