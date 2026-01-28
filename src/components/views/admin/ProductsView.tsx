@@ -39,6 +39,7 @@ const AdminProductsView: React.FC = () => {
     downloadType: 'file'
   });
 
+  // Crop State
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [cropImgSrc, setCropImgSrc] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
@@ -111,9 +112,15 @@ const AdminProductsView: React.FC = () => {
   };
 
   const uploadToAppwrite = async (file: File) => {
-    const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-    const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
-    return fileUrl.toString();
+    try {
+      const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
+      // Ensure we get a valid view URL
+      const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
+      return fileUrl.toString();
+    } catch (error) {
+      console.error("Appwrite Upload Error", error);
+      throw error;
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -123,18 +130,21 @@ const AdminProductsView: React.FC = () => {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
 
+      // Handle Product File Upload
       if (productFile && formData.downloadType === 'file') {
         finalProductUrl = await uploadToAppwrite(productFile);
       }
 
+      // Handle Audio Demo Upload
       if (audioFile) {
         finalDemoUrl = await uploadToAppwrite(audioFile);
       }
 
       const submissionData = {
         ...formData,
+        price: Number(formData.price), // Ensure price is a number
         productUrl: finalProductUrl || '',
-        demoUrl: finalDemoUrl || '',
+        demoUrl: finalDemoUrl || '', // Ensure empty string if no demo
         uploadDate: new Date().toISOString().split('T')[0]
       };
 
@@ -144,14 +154,15 @@ const AdminProductsView: React.FC = () => {
         await addDoc(collection(db, "products"), { ...submissionData, sales: 0 });
       }
       
-      fetchProducts();
+      await fetchProducts(); // Wait for fetch
       setIsModalOpen(false);
     } catch (error) {
       console.error(error);
-      alert("Failed to save product.");
+      alert("Failed to save product. Check console.");
     } finally { setIsSaving(false); }
   };
 
+  // --- Cropping Logic (Unchanged but kept for completeness) ---
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -205,7 +216,7 @@ const AdminProductsView: React.FC = () => {
         ctx.drawImage(cropImgRef.current, cropOffset.x, cropOffset.y, imgDimensions.width * baseScale * cropZoom, imgDimensions.height * baseScale * cropZoom);
         
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setFormData({...formData, image: dataUrl});
+        setFormData(prev => ({...prev, image: dataUrl}));
         setIsCropOpen(false);
       } finally { setIsProcessingCrop(false); }
   };
@@ -248,12 +259,17 @@ const AdminProductsView: React.FC = () => {
                   <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {product.category}</span>
                   <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {product.sales || 0} Sales</span>
                 </div>
+                {/* Admin Visual check for Demo URL */}
+                <div className="text-[10px] text-gray-400">
+                    {product.demoUrl ? "Has Audio Demo" : "No Audio Demo"}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {/* MODAL START */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -267,6 +283,7 @@ const AdminProductsView: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-6">
                   <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Left Column: Media */}
                       <div className="space-y-6">
                          <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cover Art</label>
@@ -277,6 +294,7 @@ const AdminProductsView: React.FC = () => {
                             </div>
                          </div>
 
+                         {/* Product File Section */}
                          <div className="bg-gray-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                             <div className="flex items-center justify-between">
                                <span className="font-bold text-sm">Product File (Appwrite)</span>
@@ -297,13 +315,19 @@ const AdminProductsView: React.FC = () => {
                             )}
                          </div>
 
+                         {/* Audio Demo Section */}
                          <div className="bg-gray-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-3">
                             <label className="text-sm font-bold flex items-center gap-2"><Music className="w-4 h-4" /> Audio Demo</label>
                             <input type="file" accept="audio/*" className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
-                            {audioFile && <p className="text-[10px] font-bold text-green-600">Selected: {audioFile.name}</p>}
+                            {audioFile ? (
+                                <p className="text-[10px] font-bold text-green-600">Selected: {audioFile.name}</p>
+                            ) : formData.demoUrl ? (
+                                <p className="text-[10px] text-gray-500 truncate">Current: {formData.demoUrl}</p>
+                            ) : null}
                          </div>
                       </div>
 
+                      {/* Right Column: Details */}
                       <div className="space-y-6">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Product Name</label>
@@ -342,6 +366,7 @@ const AdminProductsView: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* CROP MODAL */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
