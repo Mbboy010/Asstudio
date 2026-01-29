@@ -90,19 +90,29 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState: initialCartState,
   reducers: {
-    // 1. THIS IS NEW: Used to load cart from Database
     setCart: (state, action: PayloadAction<CartItem[]>) => {
       state.items = action.payload;
     },
     addToCart: (state, action: PayloadAction<Product>) => {
       const existing = state.items.find(i => i.id === action.payload.id);
       if (existing) {
-        // This prevents duplicates (Double Money issue)
         existing.quantity += 1;
       } else {
         state.items.push({ ...action.payload, quantity: 1 });
       }
       state.isOpen = true;
+    },
+    // ✅ NEW: Logic to minus quantity
+    decreaseQuantity: (state, action: PayloadAction<string>) => {
+      const item = state.items.find(i => i.id === action.payload);
+      if (item) {
+        if (item.quantity > 1) {
+          item.quantity -= 1;
+        } else {
+          // If quantity is 1 and user clicks minus, remove it
+          state.items = state.items.filter(i => i.id !== action.payload);
+        }
+      }
     },
     removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter(i => i.id !== action.payload);
@@ -116,8 +126,8 @@ const cartSlice = createSlice({
   },
 });
 
-// Export setCart here
-export const { addToCart, removeFromCart, toggleCart, clearCart, setCart } = cartSlice.actions;
+// ✅ Exporting the new decreaseQuantity action
+export const { addToCart, decreaseQuantity, removeFromCart, toggleCart, clearCart, setCart } = cartSlice.actions;
 
 // --- Store ---
 export const store = configureStore({

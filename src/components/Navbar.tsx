@@ -19,7 +19,7 @@ interface AuthUser {
   email?: string | null;
   displayName?: string | null;
   avatar?: string | null;
-  role?: string; // Important for Admin Panel
+  role?: string; 
 }
 
 export const Navbar: React.FC = () => {
@@ -27,53 +27,50 @@ export const Navbar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const { items } = useSelector((state: RootState) => state.cart);
-  
+
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth) as { 
     user: AuthUser | null; 
     isAuthenticated: boolean 
   };
-  
+
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  
-  // Prevents saving empty cart to DB on initial page load
+
+  // ✅ CRITICAL: Flag to prevent saving until initial load is finished
   const [isCartLoaded, setIsCartLoaded] = useState(false); 
 
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Helper to safely get User ID
   const getUserId = () => user?.uid || user?.id || auth.currentUser?.uid;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 1. LOAD CART FROM DB (Collection: 'carts', Doc ID: UserID)
+  // 1. LOAD CART FROM FIREBASE (On Refresh)
   useEffect(() => {
     const loadCartFromDb = async () => {
       const userId = getUserId();
-      
       if (isAuthenticated && userId) {
         try {
-          // This finds the document with the SAME ID as the User
           const cartRef = doc(db, 'carts', userId);
           const docSnap = await getDoc(cartRef);
-          
+
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.items && data.items.length > 0) {
+            if (data.items) {
                dispatch(setCart(data.items));
             }
           }
         } catch (error) {
           console.error("Error loading cart:", error);
         } finally {
-          setIsCartLoaded(true);
+          setIsCartLoaded(true); // Signal that we are ready to save updates
         }
-      } else {
-        setIsCartLoaded(true); 
+      } else if (!isAuthenticated) {
+          setIsCartLoaded(true); // Allow empty cart for guests
       }
     };
 
@@ -82,26 +79,23 @@ export const Navbar: React.FC = () => {
     }
   }, [isAuthenticated, user, dispatch, mounted]);
 
-  // 2. SAVE CART TO DB
+  // 2. SAVE CART TO FIREBASE
   useEffect(() => {
     const saveCartToDb = async () => {
       const userId = getUserId();
-      
-      // Don't save if we haven't loaded yet (prevents overwriting DB with empty Redux state)
-      if (!isCartLoaded) return; 
 
-      if (isAuthenticated && userId) {
-        try {
-          // Save to Collection: 'carts', Document: UserID
-          const cartRef = doc(db, 'carts', userId);
-          await setDoc(cartRef, {
-            items: items, 
-            updatedAt: new Date().toISOString(),
-            userId: userId // Storing ID inside doc too for easier searching
-          }, { merge: true });
-        } catch (error) {
-          console.error("Error saving cart to database:", error);
-        }
+      // Only save if the user is logged in AND we have already attempted to load the initial cart
+      if (!isCartLoaded || !isAuthenticated || !userId) return; 
+
+      try {
+        const cartRef = doc(db, 'carts', userId);
+        await setDoc(cartRef, {
+          items: items, 
+          updatedAt: new Date().toISOString(),
+          userId: userId 
+        }, { merge: true });
+      } catch (error) {
+        console.error("Error saving cart to database:", error);
       }
     };
 
@@ -124,27 +118,22 @@ export const Navbar: React.FC = () => {
       router.push('/login');
       return;
     }
-    
     const currentUser = auth.currentUser;
     if (currentUser) {
         try { await currentUser.reload(); } catch (e) { console.error(e); }
-
         if (!currentUser.emailVerified) {
             try {
                 await sendEmailVerification(currentUser);
-                dispatch(setError(`Account not verified. Verification link sent to ${currentUser.email}.`));
+                dispatch(setError(`Account not verified. Check ${currentUser.email}.`));
             } catch (error: unknown) {
-                const authErr = error as AuthError;
-                dispatch(setError(authErr.code === 'auth/too-many-requests' ? "Check your inbox." : "Failed to send email."));
+                dispatch(setError("Check your inbox."));
             }
             return;
         }
     } else {
-        dispatch(setError("Session expired."));
         router.push('/login');
         return;
     }
-
     dispatch(toggleCart());
   };
 
@@ -152,7 +141,7 @@ export const Navbar: React.FC = () => {
     <nav className="sticky top-0 z-[60] w-full backdrop-blur-xl bg-white/80 dark:bg-black/80 border-b border-gray-200 dark:border-zinc-800 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          
+
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-10 h-10 flex items-center justify-center bg-black dark:bg-zinc-900 rounded-lg overflow-hidden border border-rose-500/30 group-hover:border-rose-500 transition-colors">
@@ -165,7 +154,6 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
 
-          {/* DESKTOP MENU */}
           <div className="hidden md:flex items-center space-x-8">
             {[{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }].map((link) => (
               <Link 
@@ -182,7 +170,6 @@ export const Navbar: React.FC = () => {
               </Link>
             ))}
 
-            {/* ADMIN PANEL BUTTON (Desktop) */}
             {isAuthenticated && user?.role === 'admin' && (
               <Link href="/mb/admin" className="flex items-center gap-1 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 font-bold text-xs border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all">
                 <ShieldCheck className="w-3 h-3" />
@@ -242,6 +229,7 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
+          {/* MOBILE TOGGLE */}
           <div className="flex md:hidden items-center gap-4">
              <button onClick={handleCartClick} className="relative p-2 text-gray-900 dark:text-white">
               <ShoppingBag className="w-6 h-6" />
@@ -253,45 +241,6 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* MOBILE MENU */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200 dark:border-zinc-800">
-            <div className="px-4 py-6 space-y-2">
-              <Link href="/" className="block px-4 py-3 rounded-xl text-lg font-medium text-gray-900 dark:text-white">Home</Link>
-              <Link href="/shop" className="block px-4 py-3 rounded-xl text-lg font-medium text-gray-900 dark:text-white">Shop</Link>
-              
-              <div className="border-t border-gray-100 dark:border-zinc-800 my-4 pt-4"></div>
-              
-              {isAuthenticated ? (
-                 <>
-                  <div className="px-4 mb-4 flex items-center gap-3">
-                    <div className="relative w-10 h-10"><Image src={user?.avatar || "https://ui-avatars.com/api/?name=User"} alt="Avatar" fill className="rounded-full object-cover" /></div>
-                    <div>
-                      <p className="font-bold text-gray-900 dark:text-white">{user?.displayName}</p>
-                      <p className="text-xs text-gray-500">{user?.email}</p>
-                    </div>
-                  </div>
-                  
-                  <Link href="/dashboard" className="block px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300">My Dashboard</Link>
-                  
-                  {/* ADMIN PANEL BUTTON (Mobile) */}
-                  {user?.role === 'admin' && (
-                    <Link href="/mb/admin" className="block px-4 py-3 rounded-xl font-bold text-rose-600 bg-rose-50 dark:bg-rose-900/10">
-                      Access Admin Panel
-                    </Link>
-                  )}
-
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-500">Sign Out</button>
-                 </>
-              ) : (
-                  <Link href="/login" className="block w-full text-center px-4 py-4 rounded-xl font-bold bg-rose-600 text-white">Login / Sign Up</Link>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </nav>
   );
 };

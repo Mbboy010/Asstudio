@@ -54,13 +54,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         router.push('/login');
         return;
     }
-    
+
     // 
 
     setIsCheckingOut(true);
     try {
         const total = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        
+
         // Create Order Record
         await addDoc(collection(db, "orders"), {
             userId: user.id,
@@ -84,7 +84,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-black text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
-      
+
       {/* Global Error Banner */}
       <AnimatePresence>
         {error && (
