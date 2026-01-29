@@ -5,13 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-// Make sure to export 'setCart' from your store/cartSlice
 import { RootState, logout, toggleCart, setError, setCart } from '../store';
-import { ShoppingBag, User as UserIcon, Sun, Moon, Search, Menu, X, LogOut } from 'lucide-react';
+import { ShoppingBag, User as UserIcon, Sun, Moon, Search, Menu, X, LogOut, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailVerification, AuthError } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore'; // Added getDoc
+import { doc, setDoc, getDoc } from 'firebase/firestore'; 
 import { useTheme } from 'next-themes';
 
 interface AuthUser {
@@ -20,7 +19,7 @@ interface AuthUser {
   email?: string | null;
   displayName?: string | null;
   avatar?: string | null;
-  role?: string;
+  role?: string; // Important for Admin Panel
 }
 
 export const Navbar: React.FC = () => {
@@ -39,28 +38,31 @@ export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   
-  // New State: prevents saving empty cart to DB on initial page load
+  // Prevents saving empty cart to DB on initial page load
   const [isCartLoaded, setIsCartLoaded] = useState(false); 
 
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  // Helper to safely get User ID
+  const getUserId = () => user?.uid || user?.id || auth.currentUser?.uid;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 1. LOAD CART FROM DB ON LOGIN / REFRESH
+  // 1. LOAD CART FROM DB (Collection: 'carts', Doc ID: UserID)
   useEffect(() => {
     const loadCartFromDb = async () => {
-      const userId = user?.uid || user?.id;
+      const userId = getUserId();
+      
       if (isAuthenticated && userId) {
         try {
+          // This finds the document with the SAME ID as the User
           const cartRef = doc(db, 'carts', userId);
           const docSnap = await getDoc(cartRef);
           
           if (docSnap.exists()) {
             const data = docSnap.data();
-            // Dispatch action to update Redux with DB data
-            // This ensures when they refresh, they see their old cart
             if (data.items && data.items.length > 0) {
                dispatch(setCart(data.items));
             }
@@ -68,11 +70,9 @@ export const Navbar: React.FC = () => {
         } catch (error) {
           console.error("Error loading cart:", error);
         } finally {
-          // Mark as loaded so the Save effect can start working
           setIsCartLoaded(true);
         }
       } else {
-        // If not logged in, we are technically "loaded" with a local cart
         setIsCartLoaded(true); 
       }
     };
@@ -82,22 +82,22 @@ export const Navbar: React.FC = () => {
     }
   }, [isAuthenticated, user, dispatch, mounted]);
 
-  // 2. SAVE CART TO DB (Only if loaded and user is logged in)
+  // 2. SAVE CART TO DB
   useEffect(() => {
     const saveCartToDb = async () => {
-      const userId = user?.uid || user?.id;
+      const userId = getUserId();
       
-      // Crucial Check: !isCartLoaded
-      // We do NOT save if we haven't finished loading from DB yet.
-      // This prevents the empty initial Redux state from wiping the DB.
+      // Don't save if we haven't loaded yet (prevents overwriting DB with empty Redux state)
       if (!isCartLoaded) return; 
 
       if (isAuthenticated && userId) {
         try {
+          // Save to Collection: 'carts', Document: UserID
           const cartRef = doc(db, 'carts', userId);
           await setDoc(cartRef, {
-            items: items, // This saves the current Redux state
+            items: items, 
             updatedAt: new Date().toISOString(),
+            userId: userId // Storing ID inside doc too for easier searching
           }, { merge: true });
         } catch (error) {
           console.error("Error saving cart to database:", error);
@@ -105,7 +105,6 @@ export const Navbar: React.FC = () => {
       }
     };
 
-    // Debounce slightly could be good here, but direct effect is fine for now
     if (mounted) {
       saveCartToDb();
     }
@@ -117,8 +116,6 @@ export const Navbar: React.FC = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    // Optional: Clear cart on logout
-    // dispatch(setCart([])); 
     router.push('/');
   };
 
@@ -168,6 +165,7 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
 
+          {/* DESKTOP MENU */}
           <div className="hidden md:flex items-center space-x-8">
             {[{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }].map((link) => (
               <Link 
@@ -183,8 +181,11 @@ export const Navbar: React.FC = () => {
                 )}
               </Link>
             ))}
+
+            {/* ADMIN PANEL BUTTON (Desktop) */}
             {isAuthenticated && user?.role === 'admin' && (
-              <Link href="/mb/admin" className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 font-bold text-xs border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all">
+              <Link href="/mb/admin" className="flex items-center gap-1 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 font-bold text-xs border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all">
+                <ShieldCheck className="w-3 h-3" />
                 ADMIN PANEL
               </Link>
             )}
@@ -253,13 +254,16 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
+      {/* MOBILE MENU */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200 dark:border-zinc-800">
             <div className="px-4 py-6 space-y-2">
               <Link href="/" className="block px-4 py-3 rounded-xl text-lg font-medium text-gray-900 dark:text-white">Home</Link>
               <Link href="/shop" className="block px-4 py-3 rounded-xl text-lg font-medium text-gray-900 dark:text-white">Shop</Link>
+              
               <div className="border-t border-gray-100 dark:border-zinc-800 my-4 pt-4"></div>
+              
               {isAuthenticated ? (
                  <>
                   <div className="px-4 mb-4 flex items-center gap-3">
@@ -269,7 +273,16 @@ export const Navbar: React.FC = () => {
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
                   </div>
+                  
                   <Link href="/dashboard" className="block px-4 py-3 rounded-xl text-gray-600 dark:text-gray-300">My Dashboard</Link>
+                  
+                  {/* ADMIN PANEL BUTTON (Mobile) */}
+                  {user?.role === 'admin' && (
+                    <Link href="/mb/admin" className="block px-4 py-3 rounded-xl font-bold text-rose-600 bg-rose-50 dark:bg-rose-900/10">
+                      Access Admin Panel
+                    </Link>
+                  )}
+
                   <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-500">Sign Out</button>
                  </>
               ) : (
