@@ -2,22 +2,22 @@
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, addToCart, setError } from '@/store';
 import { 
   Pause, Play, Download, ShoppingCart, Check, ArrowLeft, Calendar, 
   HardDrive, Star, MessageSquare, ThumbsUp, User, Trash2, Edit2, X, 
   Image as ImageIcon, Loader, Volume2, 
-  VolumeX, Share2, Info, Save
+  VolumeX, Share2, Info, Save, ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
-// Removed: import Image from 'next/image'; 
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DetailSkeleton } from '@/components/ui/Skeleton';
-import { doc, getDoc, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { 
+  doc, getDoc, collection, addDoc, query, orderBy, 
+  onSnapshot, deleteDoc, updateDoc, setDoc, where, limit, getDocs, increment, runTransaction 
+} from 'firebase/firestore';
 import { db, auth } from '@/firebase';
-import { sendEmailVerification } from 'firebase/auth';
+import { sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
 
 // --- Interfaces ---
 interface AuthUser {
@@ -38,6 +38,17 @@ interface Review {
   likes: number;
   isLiked?: boolean;
 }
+
+// --- Related Product Card Component ---
+const RelatedProductCard = ({ item }: { item: Product }) => (
+  <Link href={`/shop/${item.id}`} className="flex-shrink-0 w-32 md:w-40 group">
+    <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-900 mb-2 border border-gray-100 dark:border-zinc-800">
+      <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+    </div>
+    <h4 className="text-xs font-bold truncate dark:text-white">{item.name}</h4>
+    <p className="text-[10px] text-rose-600 font-bold">₦{item.price}</p>
+  </Link>
+);
 
 const StarRating = ({ rating, size = "w-4 h-4" }: { rating: number, size?: string }) => {
   return (
@@ -87,7 +98,6 @@ const ReviewItem: React.FC<{
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
                     <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-zinc-800">
-                        {/* UPDATE 1: Standard img for user avatar */}
                         <img 
                           src={userData.avatar || '/placeholder-avatar.png'} 
                           alt={userData.name} 
@@ -106,7 +116,8 @@ const ReviewItem: React.FC<{
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => onLike(review.id)}
-                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${review.isLiked ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}
+                        disabled={!currentUser}
+                        className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-bold transition-all ${review.isLiked ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 hover:bg-gray-200'}`}
                     >
                         <ThumbsUp className={`w-3 h-3 ${review.isLiked ? 'fill-current' : ''}`} /> {review.likes}
                     </button>
@@ -138,12 +149,11 @@ const ReviewItem: React.FC<{
 const ProductDetail: React.FC = () => {
   const params = useParams();
   const id = params?.id as string; 
-  
   const router = useRouter();
-  const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth) as { user: AuthUser | null };
-  
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [newReview, setNewReview] = useState('');
@@ -159,31 +169,67 @@ const ProductDetail: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser({ id: user.uid, name: user.displayName || 'User', email: user.email || '', avatar: user.photoURL || '' });
+      } else {
+        setCurrentUser(null);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch Main Product & Related Products
+  useEffect(() => {
+    const fetchData = async () => {
         if (!id) return;
         setLoading(true);
         try {
             const docRef = doc(db, "products", id);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                setProduct({ id: docSnap.id, ...docSnap.data() } as Product);
+                const prodData = { id: docSnap.id, ...docSnap.data() } as Product;
+                setProduct(prodData);
+
+                // Fetch Related
+                const q = query(
+                    collection(db, "products"), 
+                    where("category", "==", prodData.category),
+                    limit(11) // 10 plus the current one
+                );
+                const relatedSnap = await getDocs(q);
+                const filtered = relatedSnap.docs
+                    .map(d => ({ id: d.id, ...d.data() } as Product))
+                    .filter(p => p.id !== id)
+                    .slice(0, 10);
+                setRelatedProducts(filtered);
             }
         } catch (error) {
-            console.error("Error fetching product:", error);
+            console.error(error);
         } finally {
             setLoading(false);
         }
     };
-    fetchProduct();
+    fetchData();
   }, [id]);
 
+  // Fetch Reviews with Real-time Like Status
   useEffect(() => {
     if (!id) return;
     const q = query(collection(db, "products", id, "reviews"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetchedReviews: Review[] = [];
-      snapshot.forEach((snapDoc) => {
+      
+      for (const snapDoc of snapshot.docs) {
         const data = snapDoc.data();
+        let isLiked = false;
+
+        // Check if current user liked this specific comment in DB
+        if (currentUser) {
+            const likeDoc = await getDoc(doc(db, "products", id, "reviews", snapDoc.id, "userLikes", currentUser.id));
+            isLiked = likeDoc.exists();
+        }
+
         fetchedReviews.push({
           id: snapDoc.id,
           userId: data.userId,
@@ -193,18 +239,18 @@ const ProductDetail: React.FC = () => {
           content: data.content,
           avatar: data.avatar,
           likes: data.likes || 0,
-          isLiked: false
+          isLiked: isLiked
         });
-      });
+      }
       setReviews(fetchedReviews);
     });
     return () => unsubscribe();
-  }, [id]);
+  }, [id, currentUser]);
 
   const togglePlay = () => {
     if (audioRef.current) {
         if (isPlaying) audioRef.current.pause();
-        else audioRef.current.play().catch(e => console.error("Audio play failed", e));
+        else audioRef.current.play().catch(e => console.error(e));
         setIsPlaying(!isPlaying);
     }
   };
@@ -237,113 +283,97 @@ const ProductDetail: React.FC = () => {
       }
   };
 
-  const isFree = product?.price === 0;
-
   const checkAuthAndVerification = useCallback(async () => {
+    const user = auth.currentUser;
     if (!user) {
         router.push('/login');
         return false;
     }
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-        try { await currentUser.reload(); } catch(e) { console.error(e); }
-        if (!currentUser.emailVerified) {
-            try {
-                await sendEmailVerification(currentUser);
-                dispatch(setError(`Account not verified. A verification link has been sent to ${currentUser.email}.`));
-            } catch (error: unknown) {
-                 const err = error as { message?: string };
-                 dispatch(setError(err.message || "Verification failed."));
-            }
-            return false;
-        }
-    } else {
-         dispatch(setError("Session invalid. Please log in again."));
-         router.push('/login');
-         return false;
+    await user.reload();
+    if (!user.emailVerified) {
+        try { await sendEmailVerification(user); alert("Verify email first."); } catch (e) {}
+        return false;
     }
     return true;
-  }, [user, router, dispatch]);
+  }, [router]);
 
   const handleAddToCart = async (selectedProduct: Product) => {
       const allowed = await checkAuthAndVerification();
-      if (allowed) dispatch(addToCart(selectedProduct));
+      if (allowed && currentUser) {
+          try {
+              const cartItemRef = doc(db, "users", currentUser.id, "cart", selectedProduct.id);
+              await setDoc(cartItemRef, { ...selectedProduct, addedAt: new Date().toISOString(), quantity: 1 });
+              alert("Added!");
+          } catch (e) { console.error(e); }
+      }
   };
 
   const handleDownload = async (isDemo: boolean = false) => {
       const allowed = await checkAuthAndVerification();
       if (!allowed) return;
-
       setIsDownloading(true);
       try {
-          if (!isDemo && isFree && user && product) {
+          if (!isDemo && product?.price === 0 && currentUser && product) {
                await addDoc(collection(db, "orders"), {
-                  userId: user.id,
-                  userEmail: user.email,
+                  userId: currentUser.id,
                   items: [{...product, quantity: 1}],
                   total: 0,
                   status: 'Completed',
                   createdAt: new Date().toISOString()
               });
           }
-          
-          if (!isDemo && product?.productUrl) {
-              window.open(product.productUrl, '_blank');
-              setIsDownloading(false);
-              return;
-          }
-
+          if (!isDemo && product?.productUrl) { window.open(product.productUrl, '_blank'); return; }
           const element = document.createElement("a");
-          const fileName = isDemo ? `${product?.name}_Demo.txt` : `${product?.name}_License.txt`;
-          const fileContent = isDemo 
-            ? `This is a demo placeholder for ${product?.name}.` 
-            : `Thank you for downloading ${product?.name} from A.S Studio!`;
-          
-          const file = new Blob([fileContent], {type: 'text/plain'});
+          const file = new Blob(["File content"], {type: 'text/plain'});
           element.href = URL.createObjectURL(file);
-          element.download = fileName;
-          document.body.appendChild(element);
+          element.download = isDemo ? "demo.txt" : "full.txt";
           element.click();
-          document.body.removeChild(element);
-
-      } catch (error) {
-          console.error("Download failed:", error);
-          dispatch(setError("Failed to process download."));
-      } finally {
-          setIsDownloading(false);
-      }
+      } finally { setIsDownloading(false); }
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReview.trim() || !user || !id) return;
+    if (!newReview.trim() || !currentUser || !id) return;
     setIsSubmittingReview(true);
     try {
         await addDoc(collection(db, "products", id, "reviews"), {
-            userId: user.id,
-            user: user.name,
+            userId: currentUser.id,
+            user: currentUser.name,
             rating: userRating,
             content: newReview,
-            avatar: user.avatar,
+            avatar: currentUser.avatar,
             createdAt: new Date().toISOString(),
             likes: 0
         });
         setNewReview('');
-    } catch (error) {
-        console.error("Error submitting review:", error);
-    } finally {
-        setIsSubmittingReview(false);
-    }
+    } finally { setIsSubmittingReview(false); }
   };
 
-  const handleLike = (reviewId: string) => {
-    setReviews(reviews.map(review => review.id === reviewId ? { ...review, isLiked: !review.isLiked, likes: review.isLiked ? review.likes - 1 : review.likes + 1 } : review));
+  // PERSISTENT LIKE SYSTEM
+  const handleLike = async (reviewId: string) => {
+    if (!currentUser || !id) return;
+    
+    const reviewRef = doc(db, "products", id, "reviews", reviewId);
+    const userLikeRef = doc(db, "products", id, "reviews", reviewId, "userLikes", currentUser.id);
+
+    try {
+        const likeDoc = await getDoc(userLikeRef);
+        if (likeDoc.exists()) {
+            // Unlike
+            await deleteDoc(userLikeRef);
+            await updateDoc(reviewRef, { likes: increment(-1) });
+        } else {
+            // Like
+            await setDoc(userLikeRef, { likedAt: new Date().toISOString() });
+            await updateDoc(reviewRef, { likes: increment(1) });
+        }
+    } catch (e) {
+        console.error("Like error:", e);
+    }
   };
 
   const handleDelete = async (reviewId: string) => {
-    if (window.confirm('Delete review?')) {
-      await deleteDoc(doc(db, "products", id, "reviews", reviewId));
-    }
+    if (window.confirm('Delete?')) await deleteDoc(doc(db, "products", id, "reviews", reviewId));
   };
 
   const handleUpdate = async (reviewId: string, content: string) => {
@@ -351,183 +381,112 @@ const ProductDetail: React.FC = () => {
   };
 
   const handleShare = async () => {
-    if (typeof window === 'undefined') return;
-    const shareUrl = window.location.href;
-    const shareData = {
-        title: product?.name || 'A.S Studio',
-        text: `Check out ${product?.name} on A.S Studio!`,
-        url: shareUrl
-    };
-
-    const copyToClipboard = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (clipboardErr) {
-             console.error('Clipboard copy failed:', clipboardErr);
-        }
-    };
-
-    if (navigator.share) {
-        try {
-            await navigator.share(shareData);
-        } catch (err: unknown) {
-            const error = err as { name?: string };
-            if (error.name === 'AbortError') return;
-            await copyToClipboard();
-        }
-    } else {
-        await copyToClipboard();
+    try { await navigator.share({ url: window.location.href }); } catch (e) {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true); setTimeout(() => setCopied(false), 2000);
     }
   };
 
   if (loading || !product) return <DetailSkeleton />;
 
   return (
-    <div className="min-h-screen py-12 px-4 max-w-7xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white transition-colors duration-300">
-      <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }}>
-        <Link href="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">
-            <div className="p-1 rounded-full bg-gray-100 dark:bg-zinc-900 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/20">
-               <ArrowLeft className="w-4 h-4" />
-            </div>
-            Back to Catalog
-        </Link>
-      </motion.div>
+    <div className="min-h-screen py-12 px-4 max-w-7xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white transition-colors">
+      <Link href="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">
+         <ArrowLeft className="w-4 h-4" /> Back to Catalog
+      </Link>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl">
-           <div className="aspect-square relative">
-               {/* UPDATE 2: Standard img for product main image */}
-               {product.image ? (
-                  <img 
-                    src={product.image} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover" 
-                  />
-               ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-zinc-700">
-                     <ImageIcon className="w-24 h-24 opacity-50" />
-                  </div>
-               )}
-               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
-           </div>
-           
+        <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl">
+           <img src={product.image} alt={product.name} className="w-full aspect-square object-cover" />
            {product.demoUrl && (
                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-4 rounded-xl flex items-center gap-4 border border-gray-200 dark:border-zinc-800 shadow-lg">
+                  <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-4 rounded-xl flex items-center gap-4 border border-gray-200 dark:border-zinc-800">
                      <audio ref={audioRef} src={product.demoUrl} onTimeUpdate={handleTimeUpdate} onEnded={() => setIsPlaying(false)} />
-                     <button onClick={togglePlay} className="w-12 h-12 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-700 hover:scale-105 transition-all flex-shrink-0 shadow-lg shadow-rose-600/30">
-                        {isPlaying ? <Pause className="fill-current w-5 h-5" /> : <Play className="fill-current ml-1 w-5 h-5" />}
+                     <button onClick={togglePlay} className="w-12 h-12 bg-rose-600 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                        {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="ml-1 w-5 h-5 fill-current" />}
                      </button>
-                     <div className="flex-1 flex flex-col gap-1.5">
-                        <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden relative group cursor-pointer">
-                           <div className="h-full bg-rose-600 relative z-10 rounded-full" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}></div>
-                           <input type="range" min="0" max={duration || 0} value={currentTime} onChange={handleSeek} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
-                        </div>
-                        <div className="flex justify-between text-[10px] font-bold text-gray-400 font-mono">
-                           <span>{formatTime(currentTime)}</span>
-                           <span>{formatTime(duration)}</span>
-                        </div>
+                     <div className="flex-1">
+                        <input type="range" min="0" max={duration || 0} value={currentTime} onChange={handleSeek} className="w-full h-1 bg-gray-200 accent-rose-600" />
+                        <div className="flex justify-between text-[10px] mt-1 text-gray-400"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
                      </div>
-                     <button onClick={toggleMute} className="text-gray-400 hover:text-rose-600 transition-colors">
-                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                     </button>
                   </div>
                </div>
            )}
-        </motion.div>
+        </div>
 
-        <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="flex flex-col justify-center">
-           <div className="mb-4 flex items-center justify-between">
-              <span className="inline-block px-3 py-1 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-500 font-bold text-xs rounded-full uppercase tracking-wider border border-rose-100 dark:border-rose-900/20">
-                  {product.category || 'Product'}
-              </span>
-              <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
-                  <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5" /> {product.size || 'N/A'}</span>
-                  <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {product.uploadDate || 'Recent'}</span>
-              </div>
-           </div>
-           
-           <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 text-gray-900 dark:text-white">{product.name}</h1>
-           
-           <div className="flex items-center justify-between mb-8 pb-8 border-b border-gray-100 dark:border-zinc-800">
+        <div className="flex flex-col justify-center">
+           <span className="px-3 py-1 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-500 font-bold text-xs rounded-full uppercase w-fit mb-4">{product.category}</span>
+           <h1 className="text-4xl md:text-6xl font-black mb-4">{product.name}</h1>
+           <div className="flex items-center justify-between mb-8 pb-8 border-b dark:border-zinc-800">
               <div className="flex items-center gap-3">
-                  <StarRating rating={product.rating || 5} size="w-5 h-5" />
-                  <span className="text-gray-500 text-sm font-medium">{reviews.length} reviews</span>
-                  <div className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-700"></div>
-                  <span className="text-gray-900 dark:text-white text-sm font-bold flex items-center gap-1">
-                     <Check className="w-4 h-4 text-green-500" /> {product.sales || 0} Sold
-                  </span>
+                  <StarRating rating={product.rating || 5} />
+                  <span className="text-gray-500 text-sm">{reviews.length} reviews</span>
               </div>
-              <button onClick={handleShare} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 transition-colors">
+              <button onClick={handleShare} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800">
                   {copied ? <Check className="w-5 h-5 text-green-500" /> : <Share2 className="w-5 h-5" />}
               </button>
            </div>
-
-           <div className="mb-8">
-               <div className="text-4xl font-mono font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  {isFree ? <span className="text-green-600">FREE</span> : <span>₦{product.price}</span>}
-               </div>
-           </div>
-           
-           <div className="text-gray-600 dark:text-gray-300 mb-8 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: product.description }} />
-
+           <div className="text-4xl font-bold mb-8">{product.price === 0 ? "FREE" : `₦${product.price}`}</div>
            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              {isFree ? (
-                  <button onClick={() => handleDownload(false)} disabled={isDownloading} className="flex-1 py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-2">
-                     {isDownloading ? <Loader className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />} Download Now
-                  </button>
+              {product.price === 0 ? (
+                  <button onClick={() => handleDownload(false)} disabled={isDownloading} className="flex-1 py-4 bg-rose-600 text-white font-bold rounded-xl">{isDownloading ? "..." : "Download Now"}</button>
               ) : (
                   <>
-                      <button onClick={() => handleAddToCart(product)} className="flex-[2] py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-2">
-                         <ShoppingCart className="w-5 h-5" /> Add To Cart
-                      </button>
-                      <button onClick={() => handleDownload(true)} disabled={isDownloading} className="flex-1 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-rose-500 transition-all">
-                         {isDownloading ? <Loader className="w-5 h-5 animate-spin"/> : "Demo"}
-                      </button>
+                      <button onClick={() => handleAddToCart(product)} className="flex-[2] py-4 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2"><ShoppingCart className="w-5 h-5" /> Add To Cart</button>
+                      <button onClick={() => handleDownload(true)} className="flex-1 py-4 bg-white dark:bg-zinc-900 border dark:border-zinc-700 font-bold rounded-xl">Demo</button>
                   </>
               )}
            </div>
-        </motion.div>
+        </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} className="border-t border-gray-100 dark:border-zinc-800 pt-16">
+      {/* GOOGLE PLAY STYLE RELATED PRODUCTS */}
+      {relatedProducts.length > 0 && (
+        <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-black flex items-center gap-2">You may also like <ChevronRight className="w-5 h-5 text-rose-600" /></h3>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide no-scrollbar touch-pan-x">
+                {relatedProducts.map(item => (
+                    <RelatedProductCard key={item.id} item={item} />
+                ))}
+            </div>
+        </div>
+      )}
+
+      {/* REVIEWS SECTION */}
+      <div className="border-t dark:border-zinc-800 pt-16">
         <div className="flex flex-col md:flex-row gap-12">
-           <div className="w-full md:w-1/3 space-y-8">
-              <div className="bg-gray-50 dark:bg-zinc-900 p-6 rounded-2xl">
-                 <h3 className="font-bold mb-4">Write a Review</h3>
-                 {user ? (
+           <div className="w-full md:w-1/3">
+              <div className="bg-gray-50 dark:bg-zinc-900 p-6 rounded-2xl sticky top-24">
+                 <h3 className="font-bold mb-4">Rate this product</h3>
+                 {currentUser ? (
                    <form onSubmit={handleSubmitReview} className="space-y-4">
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                          {[1,2,3,4,5].map(star => (
-                            <button type="button" key={star} onClick={() => setUserRating(star)}>
-                               <Star className={`w-8 h-8 ${star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                            </button>
+                            <button type="button" key={star} onClick={() => setUserRating(star)}><Star className={`w-8 h-8 ${star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} /></button>
                          ))}
                       </div>
-                      <textarea value={newReview} onChange={(e) => setNewReview(e.target.value)} className="w-full bg-white dark:bg-black border border-gray-200 dark:border-zinc-700 rounded-xl p-3 text-sm min-h-[100px]" placeholder="Feedback..." />
-                      <button disabled={isSubmittingReview} className="w-full py-3 bg-rose-600 text-white font-bold rounded-xl">
-                         {isSubmittingReview ? 'Posting...' : 'Post Review'}
-                      </button>
+                      <textarea value={newReview} onChange={(e) => setNewReview(e.target.value)} className="w-full bg-white dark:bg-black border dark:border-zinc-700 rounded-xl p-3 text-sm min-h-[100px]" placeholder="Feedback..." />
+                      <button disabled={isSubmittingReview} className="w-full py-3 bg-rose-600 text-white font-bold rounded-xl">Post Review</button>
                    </form>
                  ) : (
-                    <Link href="/login" className="block w-full py-3 bg-rose-600 text-white font-bold rounded-xl text-center">Log In to Review</Link>
+                    <button onClick={() => router.push('/login')} className="w-full py-3 bg-rose-600 text-white font-bold rounded-xl">Log In to Review</button>
                  )}
               </div>
            </div>
            
            <div className="flex-1 space-y-6">
-              <AnimatePresence>
+              <AnimatePresence mode="popLayout">
                 {reviews.map((review) => (
-                    <motion.div key={review.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}>
-                        <ReviewItem review={review} currentUser={user} onLike={handleLike} onDelete={handleDelete} onUpdate={handleUpdate} />
+                    <motion.div key={review.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <ReviewItem review={review} currentUser={currentUser} onLike={handleLike} onDelete={handleDelete} onUpdate={handleUpdate} />
                     </motion.div>
                 ))}
               </AnimatePresence>
            </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

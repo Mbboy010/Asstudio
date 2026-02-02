@@ -2,245 +2,184 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, logout, toggleCart, setError, setCart } from '../store';
-import { ShoppingBag, User as UserIcon, Sun, Moon, Search, Menu, X, LogOut, ShieldCheck } from 'lucide-react';
+import { 
+  ShoppingBag, User as UserIcon, Sun, Moon, Menu, X, 
+  LogOut, ShieldCheck, ShieldAlert 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sendEmailVerification, AuthError } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore'; 
+import { onSnapshot, collection } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useTheme } from 'next-themes';
 
-interface AuthUser {
-  uid?: string;
-  id?: string;
-  email?: string | null;
-  displayName?: string | null;
-  avatar?: string | null;
-  role?: string; 
-}
+// IMPORT THE COMPONENT
+import { CartDrawer } from './CartDrawer'; 
 
 export const Navbar: React.FC = () => {
-  const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
-  const { items } = useSelector((state: RootState) => state.cart);
-
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth) as { 
-    user: AuthUser | null; 
-    isAuthenticated: boolean 
-  };
-
   const { theme, setTheme } = useTheme();
+
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
+  // NEW: State to control the Drawer
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // ✅ CRITICAL: Flag to prevent saving until initial load is finished
-  const [isCartLoaded, setIsCartLoaded] = useState(false); 
+  const [user, setUser] = useState<any>(null);
+  const [cartCount, setCartCount] = useState(0);
 
-  const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
+  useEffect(() => { setMounted(true); }, []);
 
-  const getUserId = () => user?.uid || user?.id || auth.currentUser?.uid;
-
+  // 1. Listen to Auth
   useEffect(() => {
-    setMounted(true);
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          displayName: firebaseUser.displayName,
+          email: firebaseUser.email,
+          avatar: firebaseUser.photoURL,
+          role: firebaseUser.email === 'admin@as-studio.com' ? 'admin' : 'user' 
+        });
+      } else {
+        setUser(null);
+      }
+    });
+    return () => unsubAuth();
   }, []);
 
-  // 1. LOAD CART FROM FIREBASE (On Refresh)
+  // 2. Listen to Cart Count (for the badge)
   useEffect(() => {
-    const loadCartFromDb = async () => {
-      const userId = getUserId();
-      if (isAuthenticated && userId) {
-        try {
-          const cartRef = doc(db, 'carts', userId);
-          const docSnap = await getDoc(cartRef);
-
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.items) {
-               dispatch(setCart(data.items));
-            }
-          }
-        } catch (error) {
-          console.error("Error loading cart:", error);
-        } finally {
-          setIsCartLoaded(true); // Signal that we are ready to save updates
-        }
-      } else if (!isAuthenticated) {
-          setIsCartLoaded(true); // Allow empty cart for guests
-      }
-    };
-
-    if (mounted) {
-      loadCartFromDb();
+    if (!user?.id) {
+      setCartCount(0);
+      return;
     }
-  }, [isAuthenticated, user, dispatch, mounted]);
+    const cartRef = collection(db, "users", user.id, "cart");
+    const unsubCart = onSnapshot(cartRef, (snapshot) => {
+      setCartCount(snapshot.docs.length);
+    });
+    return () => unsubCart();
+  }, [user?.id]);
 
-  // 2. SAVE CART TO FIREBASE
-  useEffect(() => {
-    const saveCartToDb = async () => {
-      const userId = getUserId();
-
-      // Only save if the user is logged in AND we have already attempted to load the initial cart
-      if (!isCartLoaded || !isAuthenticated || !userId) return; 
-
-      try {
-        const cartRef = doc(db, 'carts', userId);
-        await setDoc(cartRef, {
-          items: items, 
-          updatedAt: new Date().toISOString(),
-          userId: userId 
-        }, { merge: true });
-      } catch (error) {
-        console.error("Error saving cart to database:", error);
-      }
-    };
-
-    if (mounted) {
-      saveCartToDb();
-    }
-  }, [items, user, isAuthenticated, mounted, isCartLoaded]);
-
-  useEffect(() => {
+  const handleLogout = async () => {
+    await signOut(auth);
+    setIsProfileOpen(false);
     setIsMobileMenuOpen(false);
-  }, [pathname]);
-
-  const handleLogout = () => {
-    dispatch(logout());
     router.push('/');
   };
 
-  const handleCartClick = async () => {
-    if (!isAuthenticated || !user) {
-      router.push('/login');
-      return;
-    }
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-        try { await currentUser.reload(); } catch (e) { console.error(e); }
-        if (!currentUser.emailVerified) {
-            try {
-                await sendEmailVerification(currentUser);
-                dispatch(setError(`Account not verified. Check ${currentUser.email}.`));
-            } catch (error: unknown) {
-                dispatch(setError("Check your inbox."));
-            }
-            return;
-        }
-    } else {
-        router.push('/login');
-        return;
-    }
-    dispatch(toggleCart());
-  };
+  if (!mounted) return null;
 
   return (
-    <nav className="sticky top-0 z-[60] w-full backdrop-blur-xl bg-white/80 dark:bg-black/80 border-b border-gray-200 dark:border-zinc-800 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+    <>
+      <nav className="sticky top-0 z-[60] w-full backdrop-blur-xl bg-white/80 dark:bg-black/80 border-b border-gray-200 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
 
-          <div className="flex-shrink-0">
+            {/* LOGO */}
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="relative w-10 h-10 flex items-center justify-center bg-black dark:bg-zinc-900 rounded-lg overflow-hidden border border-rose-500/30 group-hover:border-rose-500 transition-colors">
-                 <div className="absolute inset-0 bg-rose-600 opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                 <span className="text-rose-600 font-black text-xl relative z-10">A</span>
+              <div className="w-10 h-10 flex items-center justify-center bg-black dark:bg-zinc-900 rounded-lg border border-rose-500/30 group-hover:border-rose-500 transition-colors">
+                <span className="text-rose-600 font-black text-xl">A</span>
               </div>
-              <span className="font-black text-lg tracking-tighter text-gray-900 dark:text-white group-hover:text-rose-600 transition-colors">
-                A.S STUDIO
-              </span>
+              <span className="font-black text-lg text-gray-900 dark:text-white uppercase tracking-tighter">A.S STUDIO</span>
             </Link>
-          </div>
 
-          <div className="hidden md:flex items-center space-x-8">
-            {[{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }].map((link) => (
-              <Link 
-                key={link.name} 
-                href={link.path} 
-                className={`relative font-medium text-sm uppercase tracking-wider transition-colors hover:text-rose-600 ${
-                  pathname === link.path ? 'text-rose-600' : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                {link.name}
-                {pathname === link.path && (
-                  <motion.div layoutId="underline" className="absolute -bottom-1 left-0 right-0 h-0.5 bg-rose-600" />
-                )}
-              </Link>
-            ))}
-
-            {isAuthenticated && user?.role === 'admin' && (
-              <Link href="/mb/admin" className="flex items-center gap-1 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 font-bold text-xs border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all">
-                <ShieldCheck className="w-3 h-3" />
-                ADMIN PANEL
-              </Link>
-            )}
-          </div>
-
-          <div className="hidden md:flex items-center gap-3">
-            <div className={`relative flex items-center transition-all duration-300 ${isSearchOpen ? 'w-64' : 'w-10'}`}>
-               {isSearchOpen && (
-                 <input 
-                    type="text" placeholder="Search packs..." autoFocus onBlur={() => setIsSearchOpen(false)}
-                    className="absolute right-0 w-full bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-full py-2 px-4 pl-10 text-sm focus:ring-2 focus:ring-rose-500 text-gray-900 dark:text-white transition-all"
-                 />
-               )}
-               <button onClick={() => setIsSearchOpen(!isSearchOpen)} className={`absolute right-0 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 z-10 ${isSearchOpen ? 'text-rose-600' : 'text-gray-600 dark:text-gray-400'}`}>
-                 <Search className="w-5 h-5" />
-               </button>
+            {/* DESKTOP LINKS */}
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/" className={`text-sm font-bold uppercase hover:text-rose-600 transition-colors ${pathname === '/' ? 'text-rose-600' : ''}`}>Home</Link>
+              <Link href="/shop" className={`text-sm font-bold uppercase hover:text-rose-600 transition-colors ${pathname === '/shop' ? 'text-rose-600' : ''}`}>Shop</Link>
+              {user?.role === 'admin' && (
+                 <Link href="/mb/admin" className="flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-900/20 px-3 py-1 rounded-full border border-rose-200 dark:border-rose-800">
+                   <ShieldAlert className="w-3 h-3" /> ADMIN
+                 </Link>
+              )}
             </div>
 
-            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 ml-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-rose-600 transition-colors">
-              {mounted ? (theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />) : <div className="w-5 h-5" />}
-            </button>
+            {/* DESKTOP ACTIONS */}
+            <div className="hidden md:flex items-center gap-3">
+              <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-400 transition-colors">
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
 
-            <button onClick={handleCartClick} className="relative p-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-rose-600 transition-colors">
-              <ShoppingBag className="w-5 h-5" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white shadow-lg shadow-rose-600/40">
-                  {totalItems}
-                </span>
-              )}
-            </button>
+              {/* CART TRIGGER BUTTON */}
+              <button 
+                onClick={() => setIsCartOpen(true)} 
+                className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-400 transition-colors"
+              >
+                <ShoppingBag size={20} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white shadow-lg">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
 
-            {isAuthenticated ? (
-              <div className="relative group ml-2">
-                <Link href="/dashboard" className="block p-0.5 rounded-full border-2 border-transparent hover:border-rose-500 transition-all">
-                  <Image src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.displayName}`} alt="User" width={32} height={32} className="rounded-full object-cover bg-gray-200" />
-                </Link>
-                <div className="absolute right-0 mt-4 w-56 bg-white dark:bg-black rounded-xl shadow-xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-gray-100 dark:border-zinc-800 z-50">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 mb-2">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user?.displayName || 'User'}</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                  </div>
-                  <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-900 hover:text-rose-600">
-                    <UserIcon className="w-4 h-4" /> Profile
-                  </Link>
-                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10">
-                    <LogOut className="w-4 h-4" /> Sign out
+              {user ? (
+                <div className="relative">
+                  <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="block p-0.5 rounded-full border-2 border-rose-500 transition-transform active:scale-95">
+                    <img src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} alt="User" className="w-8 h-8 rounded-full bg-gray-200 object-cover" />
                   </button>
+                  <AnimatePresence>
+                    {isProfileOpen && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-56 bg-white dark:bg-zinc-950 rounded-xl shadow-2xl py-2 border border-gray-100 dark:border-zinc-800 z-50">
+                        <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 mb-2">
+                          <p className="text-sm font-bold truncate">{user?.displayName}</p>
+                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                        <Link href="/dashboard" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-zinc-900"><UserIcon size={16}/> Profile</Link>
+                        <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"><LogOut size={16}/> Sign out</button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            ) : (
-              <Link href="/login" className="ml-2 px-6 py-2 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold text-sm hover:opacity-80 transition-opacity">
-                Login
-              </Link>
-            )}
-          </div>
+              ) : (
+                <Link href="/login" className="px-6 py-2 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold text-sm hover:opacity-80 transition-opacity">Login</Link>
+              )}
+            </div>
 
-          {/* MOBILE TOGGLE */}
-          <div className="flex md:hidden items-center gap-4">
-             <button onClick={handleCartClick} className="relative p-2 text-gray-900 dark:text-white">
-              <ShoppingBag className="w-6 h-6" />
-              {totalItems > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white">{totalItems}</span>}
-            </button>
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 rounded-lg text-gray-900 dark:text-white">
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            {/* MOBILE TOGGLE */}
+            <div className="flex md:hidden items-center gap-2">
+              <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-900 dark:text-white">
+                <ShoppingBag size={24} />
+                {cartCount > 0 && (
+                  <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-900 dark:text-white">
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </nav>
+
+        {/* MOBILE MENU */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-white dark:bg-black border-b border-gray-200 dark:border-zinc-800 overflow-hidden">
+              <div className="px-4 pt-2 pb-6 space-y-1">
+                <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold">Home</Link>
+                <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold">Shop</Link>
+                {user ? (
+                   <button onClick={handleLogout} className="w-full text-left px-3 py-4 text-base font-bold text-red-500">Sign Out</button>
+                ) : (
+                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold text-rose-600">Login</Link>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
+
+      {/* RENDER THE DRAWER HERE */}
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={() => setIsCartOpen(false)} 
+      />
+    </>
   );
 };
