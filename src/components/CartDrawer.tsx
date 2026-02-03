@@ -16,9 +16,9 @@ import {
   increment 
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
+import { onAuthStateChanged, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 
-// Define the local interface since we aren't using Redux types
+// Define the local interface
 interface CartItem {
   id: string;
   name: string;
@@ -37,9 +37,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
 
-  // 1. Sync User Auth
+  // 1. Sync User Auth - Replaced 'any' with FirebaseUser
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (fbUser) => {
       setUser(fbUser);
@@ -47,7 +47,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     return () => unsub();
   }, []);
 
-  // 2. Real-time Cart Listener (No more manual Load/Save logic)
+  // 2. Real-time Cart Listener
   useEffect(() => {
     if (!user || !isOpen) return;
 
@@ -95,16 +95,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    await user.reload();
-    if (!user.emailVerified) {
-      await sendEmailVerification(user);
-      alert(`Please verify your email. A link was sent to ${user.email}`);
-      return;
-    }
-
-    setIsCheckingOut(true);
-
     try {
+      await user.reload();
+      if (!user.emailVerified) {
+        await sendEmailVerification(user);
+        alert(`Please verify your email. A link was sent to ${user.email}`);
+        return;
+      }
+
+      setIsCheckingOut(true);
+
       // 1. Create Order
       await addDoc(collection(db, 'orders'), {
         userId: user.uid,
@@ -119,12 +119,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       const cartRef = collection(db, "users", user.uid, "cart");
       const snapshot = await getDocs(cartRef);
       const batch = writeBatch(db);
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      snapshot.docs.forEach((d) => batch.delete(d.ref));
       await batch.commit();
 
       onClose();
       router.push('/dashboard');
-    } catch (e) {
+    } catch (error) {
+      console.error("Checkout Error:", error);
       alert('Checkout failed. Please try again.');
     } finally {
       setIsCheckingOut(false);
@@ -183,7 +184,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 items.map(item => (
                   <div key={item.id} className="flex gap-4 group">
                     <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-xl overflow-hidden flex-shrink-0 border dark:border-zinc-800">
-                      <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
+                      <img 
+                        src={item.image ?? ''} 
+                        className="w-full h-full object-cover" 
+                        alt={item.name || 'Product'} 
+                      />
                     </div>
 
                     <div className="flex-1 flex flex-col justify-between py-1">

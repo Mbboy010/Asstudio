@@ -5,16 +5,23 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   ShoppingBag, User as UserIcon, Sun, Moon, Menu, X, 
-  LogOut, ShieldCheck, ShieldAlert 
-} from 'lucide-react';
+  LogOut, ShieldAlert 
+} from 'lucide-react'; // Removed unused ShieldCheck
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db } from '../firebase';
 import { onSnapshot, collection } from 'firebase/firestore';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { useTheme } from 'next-themes';
-
-// IMPORT THE COMPONENT
 import { CartDrawer } from './CartDrawer'; 
+
+// Define a proper interface for the User state
+interface AppUser {
+  id: string;
+  displayName: string | null;
+  email: string | null;
+  avatar: string | null;
+  role: 'admin' | 'user';
+}
 
 export const Navbar: React.FC = () => {
   const router = useRouter();
@@ -24,18 +31,16 @@ export const Navbar: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  
-  // NEW: State to control the Drawer
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => { setMounted(true); }, []);
 
   // 1. Listen to Auth
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         setUser({
           id: firebaseUser.uid,
@@ -51,7 +56,7 @@ export const Navbar: React.FC = () => {
     return () => unsubAuth();
   }, []);
 
-  // 2. Listen to Cart Count (for the badge)
+  // 2. Listen to Cart Count
   useEffect(() => {
     if (!user?.id) {
       setCartCount(0);
@@ -104,7 +109,6 @@ export const Navbar: React.FC = () => {
                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
               </button>
 
-              {/* CART TRIGGER BUTTON */}
               <button 
                 onClick={() => setIsCartOpen(true)} 
                 className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-400 transition-colors"
@@ -120,7 +124,11 @@ export const Navbar: React.FC = () => {
               {user ? (
                 <div className="relative">
                   <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="block p-0.5 rounded-full border-2 border-rose-500 transition-transform active:scale-95">
-                    <img src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} alt="User" className="w-8 h-8 rounded-full bg-gray-200 object-cover" />
+                    <img 
+                      src={user?.avatar ?? `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} 
+                      alt={user?.displayName || 'User profile'} 
+                      className="w-8 h-8 rounded-full bg-gray-200 object-cover" 
+                    />
                   </button>
                   <AnimatePresence>
                     {isProfileOpen && (
@@ -175,7 +183,6 @@ export const Navbar: React.FC = () => {
         </AnimatePresence>
       </nav>
 
-      {/* RENDER THE DRAWER HERE */}
       <CartDrawer 
         isOpen={isCartOpen} 
         onClose={() => setIsCartOpen(false)} 
