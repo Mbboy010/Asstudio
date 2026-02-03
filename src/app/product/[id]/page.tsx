@@ -3,10 +3,9 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
-  Pause, Play, Download, ShoppingCart, Check, ArrowLeft, Calendar, 
-  HardDrive, Star, MessageSquare, ThumbsUp, User, Trash2, Edit2, X, 
-  Image as ImageIcon, Loader, Volume2, 
-  VolumeX, Share2, Info, Save, ChevronRight
+  Pause, Play, ShoppingCart, Check, ArrowLeft, 
+  Star, ThumbsUp, Trash2, Edit2, X, 
+  Loader, Share2, Save, ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { Product } from '@/types';
@@ -14,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DetailSkeleton } from '@/components/ui/Skeleton';
 import { 
   doc, getDoc, collection, addDoc, query, orderBy, 
-  onSnapshot, deleteDoc, updateDoc, setDoc, where, limit, getDocs, increment, runTransaction 
+  onSnapshot, deleteDoc, updateDoc, setDoc, where, limit, getDocs, increment 
 } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
@@ -41,9 +40,13 @@ interface Review {
 
 // --- Related Product Card Component ---
 const RelatedProductCard = ({ item }: { item: Product }) => (
-  <Link href={`/shop/${item.id}`} className="flex-shrink-0 w-32 md:w-40 group">
+  <Link href={`/product/${item.id}`} className="flex-shrink-0 w-32 md:w-40 group">
     <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-zinc-900 mb-2 border border-gray-100 dark:border-zinc-800">
-      <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+      <img 
+        src={item.image ?? ''} 
+        alt={item.name || 'Product'} 
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+      />
     </div>
     <h4 className="text-xs font-bold truncate dark:text-white">{item.name}</h4>
     <p className="text-[10px] text-rose-600 font-bold">₦{item.price}</p>
@@ -166,7 +169,6 @@ const ProductDetail: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -179,7 +181,6 @@ const ProductDetail: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Fetch Main Product & Related Products
   useEffect(() => {
     const fetchData = async () => {
         if (!id) return;
@@ -191,11 +192,10 @@ const ProductDetail: React.FC = () => {
                 const prodData = { id: docSnap.id, ...docSnap.data() } as Product;
                 setProduct(prodData);
 
-                // Fetch Related
                 const q = query(
                     collection(db, "products"), 
                     where("category", "==", prodData.category),
-                    limit(11) // 10 plus the current one
+                    limit(11)
                 );
                 const relatedSnap = await getDocs(q);
                 const filtered = relatedSnap.docs
@@ -213,7 +213,6 @@ const ProductDetail: React.FC = () => {
     fetchData();
   }, [id]);
 
-  // Fetch Reviews with Real-time Like Status
   useEffect(() => {
     if (!id) return;
     const q = query(collection(db, "products", id, "reviews"), orderBy("createdAt", "desc"));
@@ -224,7 +223,6 @@ const ProductDetail: React.FC = () => {
         const data = snapDoc.data();
         let isLiked = false;
 
-        // Check if current user liked this specific comment in DB
         if (currentUser) {
             const likeDoc = await getDoc(doc(db, "products", id, "reviews", snapDoc.id, "userLikes", currentUser.id));
             isLiked = likeDoc.exists();
@@ -274,13 +272,6 @@ const ProductDetail: React.FC = () => {
       const min = Math.floor(time / 60);
       const sec = Math.floor(time % 60);
       return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-  };
-
-  const toggleMute = () => {
-      if (audioRef.current) {
-          audioRef.current.muted = !isMuted;
-          setIsMuted(!isMuted);
-      }
   };
 
   const checkAuthAndVerification = useCallback(async () => {
@@ -349,7 +340,6 @@ const ProductDetail: React.FC = () => {
     } finally { setIsSubmittingReview(false); }
   };
 
-  // PERSISTENT LIKE SYSTEM
   const handleLike = async (reviewId: string) => {
     if (!currentUser || !id) return;
     
@@ -359,11 +349,9 @@ const ProductDetail: React.FC = () => {
     try {
         const likeDoc = await getDoc(userLikeRef);
         if (likeDoc.exists()) {
-            // Unlike
             await deleteDoc(userLikeRef);
             await updateDoc(reviewRef, { likes: increment(-1) });
         } else {
-            // Like
             await setDoc(userLikeRef, { likedAt: new Date().toISOString() });
             await updateDoc(reviewRef, { likes: increment(1) });
         }
@@ -397,7 +385,7 @@ const ProductDetail: React.FC = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
         <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl">
-           <img src={product.image} alt={product.name} className="w-full aspect-square object-cover" />
+           <img src={product.image ?? ''} alt={product.name || 'Product'} className="w-full aspect-square object-cover" />
            {product.demoUrl && (
                <div className="absolute bottom-6 left-6 right-6">
                   <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md p-4 rounded-xl flex items-center gap-4 border border-gray-200 dark:border-zinc-800">
@@ -440,7 +428,6 @@ const ProductDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* GOOGLE PLAY STYLE RELATED PRODUCTS */}
       {relatedProducts.length > 0 && (
         <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
@@ -454,7 +441,6 @@ const ProductDetail: React.FC = () => {
         </div>
       )}
 
-      {/* REVIEWS SECTION */}
       <div className="border-t dark:border-zinc-800 pt-16">
         <div className="flex flex-col md:flex-row gap-12">
            <div className="w-full md:w-1/3">
@@ -464,7 +450,7 @@ const ProductDetail: React.FC = () => {
                    <form onSubmit={handleSubmitReview} className="space-y-4">
                       <div className="flex gap-1">
                          {[1,2,3,4,5].map(star => (
-                            <button type="button" key={star} onClick={() => setUserRating(star)}><Star className={`w-8 h-8 ${star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} /></button>
+                            <button type="button" key={star} onClick={() => setUserRating(star)}><Star key={star} className={`w-8 h-8 ${star <= userRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} /></button>
                          ))}
                       </div>
                       <textarea value={newReview} onChange={(e) => setNewReview(e.target.value)} className="w-full bg-white dark:bg-black border dark:border-zinc-700 rounded-xl p-3 text-sm min-h-[100px]" placeholder="Feedback..." />
