@@ -6,7 +6,6 @@ import { X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
-import { CartDrawer } from './CartDrawer';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 1. LOCAL UI STATE (Replacing Redux)
@@ -53,14 +52,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </AnimatePresence>
 
       {/* 2. PASSING TOGGLE TO NAVBAR */}
-      <Navbar onOpenCart={toggleCart} />
+      <Navbar />
 
       <main className="flex-grow">
         {children}
       </main>
 
       {/* 3. PASSING STATE TO DRAWER */}
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+
 
       <Footer />
     </div>
