@@ -83,7 +83,7 @@ export default async function Page({ params }: Props) {
 
   return (
     <main>
-      <ProductDetailContent product={product} />
+      <ProductDetailContent />
     </main>
   );
 }
