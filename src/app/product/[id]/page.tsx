@@ -4,24 +4,31 @@ import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebaseAdmin';
 import ProductDetailContent from "@/pages/ProductDetailContent";
 
+// 1. Define the Product interface to avoid 'any'
+interface Product {
+  id: string;
+  name?: string;
+  description?: string;
+  image?: string;
+  slug?: string;
+  [key: string]: any; // Allows for other dynamic firestore fields
+}
+
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-// Helper to clean HTML for Meta Tags
 const stripHtml = (html: string) => html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
 
-async function getProduct(id: string) {
+async function getProduct(id: string): Promise<Product | null> {
   try {
-    // 1. Try fetching by Document ID
     const docRef = adminDb.collection('products').doc(id);
     const docSnap = await docRef.get();
 
     if (docSnap.exists) {
-      return { id: docSnap.id, ...docSnap.data() };
+      return { id: docSnap.id, ...docSnap.data() } as Product;
     }
 
-    // 2. Fallback: Search by "slug" field (matches your Appwrite style)
     const querySnapshot = await adminDb
       .collection('products')
       .where('slug', '==', id)
@@ -30,7 +37,7 @@ async function getProduct(id: string) {
 
     if (!querySnapshot.empty) {
       const doc = querySnapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+      return { id: doc.id, ...doc.data() } as Product;
     }
 
     return null;
@@ -42,11 +49,11 @@ async function getProduct(id: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product: any = await getProduct(id);
+  const product = await getProduct(id); // 'any' removed here
 
   if (!product) return { title: 'Product Not Found' };
 
-  const title = `${product.name} | AS Studio`;
+  const title = `${product.name || 'Product'} | AS Studio`;
   const description = stripHtml(product.description || 'Exclusive digital assets.');
   const imageUrl = product.image || 'https://asbeatcloud.vercel.app/og-default.jpg';
 
@@ -76,7 +83,6 @@ export default async function Page({ params }: Props) {
 
   return (
     <main>
-      {/* Pass the server-fetched data to your Client Component */}
       <ProductDetailContent product={product} />
     </main>
   );
