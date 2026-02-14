@@ -4,13 +4,13 @@ import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebaseAdmin';
 import ProductDetailContent from "@/pages/ProductDetailContent";
 
-// 1. Define the Product interface to avoid 'any'
 interface Product {
   id: string;
   name?: string;
   description?: string;
   image?: string;
   slug?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // Allows for other dynamic firestore fields
 }
 
@@ -49,7 +49,7 @@ async function getProduct(id: string): Promise<Product | null> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product = await getProduct(id); // 'any' removed here
+  const product = await getProduct(id);
 
   if (!product) return { title: 'Product Not Found' };
 
