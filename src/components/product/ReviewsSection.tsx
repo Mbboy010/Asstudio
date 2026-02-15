@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { StarRating } from './ProductInfo';
-import { AuthUser, Review } from './parentComponent';
+import { AuthUser, Review } from './ProductDetailContent';
 
 // --- Sub-Component: The Individual Review Card ---
 const ReviewItem: React.FC<{
