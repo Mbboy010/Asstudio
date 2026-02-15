@@ -52,6 +52,7 @@ export async function generateMetadata(
 
   if (!product) {
     return { title: 'Product Not Found' };
+    
   }
 
   const title = `${product.name || 'Product'} | AS Studio`;
@@ -87,6 +88,7 @@ export default async function Page(
   const product = await getProduct(id);
 
   if (!product) {
+    console.log(product)
     notFound();
   }
 
