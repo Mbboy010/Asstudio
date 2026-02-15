@@ -215,23 +215,49 @@ const ProductDetail: React.FC = () => {
   };
 
   const handleDownload = async (isDemo: boolean = false) => {
-    const allowed = await checkAuthAndVerification();
-    if (!allowed) return;
+    // 1. Determine if we can bypass auth
+    const isFree = product?.price === 0;
+    const needsAuth = !isDemo && !isFree;
+
+    if (needsAuth) {
+      const allowed = await checkAuthAndVerification();
+      if (!allowed) return;
+    }
+
     setIsDownloading(true);
+    
     try {
-      if (!isDemo && product?.price === 0 && currentUser && product) {
-        await addDoc(collection(db, "orders"), {
-          userId: currentUser.id,
-          items: [{...product, quantity: 1}],
-          total: 0,
-          status: 'Completed',
-          createdAt: new Date().toISOString()
-        });
+      // 2. Optional: Record free order only if user is logged in
+      // Guests can still download, but we don't try to write to Firestore for them
+      if (!isDemo && isFree && currentUser && product) {
+        try {
+          await addDoc(collection(db, "orders"), {
+            userId: currentUser.id,
+            items: [{...product, quantity: 1}],
+            total: 0,
+            status: 'Completed',
+            createdAt: new Date().toISOString()
+          });
+        } catch (e) {
+          console.error("Background order recording failed:", e);
+          // We don't 'return' here because we want them to get the file anyway
+        }
       }
-      if (!isDemo && product?.productUrl) { window.open(product.productUrl, '_blank'); return; }
-      if (isDemo && product?.demoUrl) { window.open(product.demoUrl, '_blank'); return; }
-    } finally { setIsDownloading(false); }
+
+      // 3. Trigger Download
+      if (isDemo && product?.demoUrl) {
+        window.open(product.demoUrl, '_blank');
+      } else if (!isDemo && product?.productUrl) {
+        window.open(product.productUrl, '_blank');
+      }
+      
+    } catch (error) {
+      console.error("Download action failed:", error);
+    } finally {
+      setIsDownloading(false);
+    }
   };
+
 
   const handleShare = async () => {
     try { 
