@@ -86,7 +86,10 @@ export default async function Page(
 
   const product = await getProduct(id);
 
-  
+  if (!product) {
+    notFound();
+  }
+
   return (
     <main>
       <ProductDetailContent />
