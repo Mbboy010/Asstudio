@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
-import Image from 'next/image'; // Added for optimization
-import { Pause, Play, ShoppingCart, Share2, Check } from 'lucide-react';
+import Image from 'next/image';
+import { Pause, Play, ShoppingCart, Share2, Check, Tag } from 'lucide-react'; // Added Tag icon
 import { ExtendedProduct } from './ProductDetailContent';
 import { StarRating } from './ProductInfo';
 
@@ -10,7 +10,6 @@ interface ProductHeroProps {
   reviewsCount: number;
   isPlaying: boolean;
   togglePlay: () => void;
-  // Fix: Added "| null" to match the parent's RefObject type
   audioRef: React.RefObject<HTMLAudioElement | null>;
   currentTime: number;
   duration: number;
@@ -32,15 +31,14 @@ export const ProductHero = ({
 }: ProductHeroProps) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
-      {/* Container for Image */}
+      {/* Left: Product Media */}
       <div className="relative rounded-2xl overflow-hidden border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 shadow-xl aspect-square">
-        {/* Fix: Switched <img> to Next.js <Image /> for better LCP performance */}
         {product.image ? (
           <Image 
             src={product.image} 
             alt={product.name} 
             fill
-            priority // Helps with Largest Contentful Paint (LCP)
+            priority 
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
@@ -82,13 +80,14 @@ export const ProductHero = ({
         )}
       </div>
 
-      {/* Product Info */}
+      {/* Right: Product Info */}
       <div className="flex flex-col justify-center">
         <span className="px-3 py-1 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-500 font-bold text-xs rounded-full uppercase w-fit mb-4">
           {product.category}
         </span>
         <h1 className="text-4xl md:text-6xl font-black mb-4 tracking-tight">{product.name}</h1>
-        <div className="flex items-center justify-between mb-8 pb-8 border-b dark:border-zinc-800">
+        
+        <div className="flex items-center justify-between mb-6 pb-6 border-b dark:border-zinc-800">
           <div className="flex items-center gap-3">
             <StarRating rating={product.rating || 5} />
             <span className="text-gray-500 text-sm font-medium">{reviewsCount} reviews</span>
@@ -96,22 +95,43 @@ export const ProductHero = ({
           <button 
             onClick={handleShare} 
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-            aria-label="Share product"
           >
             {copied ? <Check className="w-5 h-5 text-green-500" /> : <Share2 className="w-5 h-5" />}
           </button>
         </div>
+
+        {/* Feature Tags Implementation */}
+        {product.features && product.features.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-8">
+            {product.features.map((feature, index) => (
+              <span 
+                key={index} 
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 text-xs font-semibold rounded-lg border border-gray-200 dark:border-zinc-700"
+              >
+                <Tag className="w-3 h-3" />
+                {feature}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">
-          {product.price === 0 ? "FREE" : `₦${product.price.toLocaleString()}`}
+          {product.price === 0 ? (
+            <span className="text-green-600 dark:text-green-500">FREE</span>
+          ) : (
+            `₦${product.price.toLocaleString()}`
+          )}
         </div>
+
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           {product.price === 0 ? (
+            /* Free Product: No auth needed in handleDownload */
             <button 
               onClick={() => handleDownload(false)} 
               disabled={isDownloading} 
-              className="flex-1 py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all active:scale-[0.98] disabled:opacity-70"
+              className="flex-1 py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-green-600/20"
             >
-              {isDownloading ? "Preparing..." : "Download Now"}
+              {isDownloading ? "Preparing..." : "Download Free Pack"}
             </button>
           ) : (
             <>
