@@ -2,7 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebaseAdmin';
-import ProductDetailContent from "@/components/ProductDetailContent";
+import ProductDetailContent from "@/components/product/ProductDetailContent";
 
 interface Product {
   id: string;
@@ -15,6 +15,8 @@ interface Product {
 
 const stripHtml = (html: string) =>
   html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
+  
+  
 
 async function getProduct(id: string): Promise<Product | null> {
   try {
@@ -42,6 +44,8 @@ async function getProduct(id: string): Promise<Product | null> {
     return null;
   }
 }
+
+
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }

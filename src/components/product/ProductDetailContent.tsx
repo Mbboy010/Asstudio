@@ -37,6 +37,8 @@ interface Review {
   rating: number;
   date: string;
   content: string;
+  uploadDate: string;
+  size: string;
   avatar: string;
   likes: number;
   isLiked?: boolean;
@@ -470,6 +472,21 @@ const ProductDetail: React.FC = () => {
       {/* --- DESCRIPTION SECTION --- */}
       {product.description && (
         <div className="mb-20 grid grid-cols-1 lg:grid-cols-12 gap-12">
+          
+          <div className="lg:col-span-4 space-y-6">
+                <div className="p-6 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800">
+                    <h4 className="font-black text-sm uppercase tracking-wider mb-4 text-gray-400">Details</h4>
+                    <div className="space-y-3">
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Price</span><span className="font-bold">{product.price === 0 ? 'Free' : `₦${product.price.toLocaleString()}`}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-bold">{product.category}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-bold">{product.rating}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-bold">{product.uploadDate}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-bold">{product.size}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-gray-500">Rating</span><span className="font-bold">{product.rating || 5.0} / 5.0</span></div>
+                    </div>
+                </div>
+            </div>
+          
             <div className="lg:col-span-8">
                 <div className="flex items-center gap-2 mb-6">
                     <Info className="w-5 h-5 text-rose-600" />
@@ -480,16 +497,7 @@ const ProductDetail: React.FC = () => {
                     dangerouslySetInnerHTML={{ __html: product.description }} 
                 />
             </div>
-            <div className="lg:col-span-4 space-y-6">
-                <div className="p-6 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800">
-                    <h4 className="font-black text-sm uppercase tracking-wider mb-4 text-gray-400">Details</h4>
-                    <div className="space-y-3">
-                        <div className="flex justify-between text-sm"><span className="text-gray-500">Price</span><span className="font-bold">{product.price === 0 ? 'Free' : `₦${product.price.toLocaleString()}`}</span></div>
-                        <div className="flex justify-between text-sm"><span className="text-gray-500">Category</span><span className="font-bold">{product.category}</span></div>
-                        <div className="flex justify-between text-sm"><span className="text-gray-500">Rating</span><span className="font-bold">{product.rating || 5.0} / 5.0</span></div>
-                    </div>
-                </div>
-            </div>
+
         </div>
       )}
 
