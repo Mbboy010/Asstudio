@@ -20,7 +20,8 @@ interface ProductHeroProps {
   copied: boolean;
   isDownloading: boolean;
   handleDownload: (isDemo: boolean) => void;
-  handleAddToCart: (product: any) => void;
+  handleAddToCart: (product: ExtendedProduct) => void;
+
 }
 
 export const ProductHero = ({
