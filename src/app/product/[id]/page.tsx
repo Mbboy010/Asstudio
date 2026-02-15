@@ -13,10 +13,6 @@ interface Product {
   [key: string]: unknown;
 }
 
-type Props = {
-  params: Promise<{ id: string }>;
-};
-
 const stripHtml = (html: string) =>
   html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
 
@@ -48,9 +44,10 @@ async function getProduct(id: string): Promise<Product | null> {
 }
 
 export async function generateMetadata(
-  { params }: Props
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
-  const { id } = params; // ✅ removed await
+  const { id } = await params;
+
   const product = await getProduct(id);
 
   if (!product) {
@@ -82,8 +79,11 @@ export async function generateMetadata(
   };
 }
 
-export default async function Page({ params }: Props) {
-  const { id } = params; // ✅ removed await
+export default async function Page(
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const product = await getProduct(id);
 
   if (!product) {
@@ -92,7 +92,7 @@ export default async function Page({ params }: Props) {
 
   return (
     <main>
-      <ProductDetailContent  />
+      <ProductDetailContent />
     </main>
   );
 }
