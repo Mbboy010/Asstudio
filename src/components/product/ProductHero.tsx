@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import Image from 'next/image';
-import { Pause, Play, ShoppingCart, Share2, Check, Tag } from 'lucide-react'; // Added Tag icon
+import { Pause, Play, ShoppingCart, Share2, Check, Tag, Download } from 'lucide-react'; 
 import { ExtendedProduct } from './ProductDetailContent';
 import { StarRating } from './ProductInfo';
 
@@ -100,7 +100,7 @@ export const ProductHero = ({
           </button>
         </div>
 
-        {/* Feature Tags Implementation */}
+        {/* Feature Tags */}
         {product.features && product.features.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-8">
             {product.features.map((feature, index) => (
@@ -117,24 +117,31 @@ export const ProductHero = ({
 
         <div className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">
           {product.price === 0 ? (
-            <span className="text-green-600 dark:text-green-500">FREE</span>
+            <span className="text-green-600 dark:text-green-500 italic">FREE</span>
           ) : (
             `₦${product.price.toLocaleString()}`
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex flex-col gap-4 mb-8">
           {product.price === 0 ? (
-            /* Free Product: No auth needed in handleDownload */
-            <button 
-              onClick={() => handleDownload(false)} 
-              disabled={isDownloading} 
-              className="flex-1 py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-green-600/20"
-            >
-              {isDownloading ? "Preparing..." : "Download Free Pack"}
-            </button>
+            /* --- UPDATED FREE SECTION --- */
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => handleDownload(false)} 
+                disabled={isDownloading} 
+                className="w-full py-5 bg-green-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-green-700 transition-all active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-green-600/20"
+              >
+                <Download className="w-5 h-5" />
+                {isDownloading ? "Preparing your download..." : "Download Free Pack Now"}
+              </button>
+              <p className="text-center text-xs text-gray-400 font-medium">
+                No account or sign-in required for this free item
+              </p>
+            </div>
           ) : (
-            <>
+            /* --- PAID SECTION --- */
+            <div className="flex flex-col sm:flex-row gap-4">
               <button 
                 onClick={() => handleAddToCart(product)} 
                 className="flex-[2] py-4 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition-all active:scale-[0.98]"
@@ -149,7 +156,7 @@ export const ProductHero = ({
                   Demo
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
