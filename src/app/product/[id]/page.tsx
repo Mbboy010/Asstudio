@@ -14,7 +14,7 @@ interface Product {
 }
 
 type Props = {
-  params: { id: string }; // ✅ FIXED
+  params: Promise<{ id: string }>;
 };
 
 const stripHtml = (html: string) =>
