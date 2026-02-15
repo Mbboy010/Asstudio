@@ -10,7 +10,8 @@ export const ScreenshotsSection = ({ screenshots, onSelect }: ScreenshotsSection
   return (
     <div className="mb-16">
       <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6">Screenshots</h3>
-      <div className="flex gap-4 overflow-x-auto pb-8 no-scrollbar touch-pan-x cursor-grab active:cursor-grabbing snap-x">
+      {/* Changed touch-pan-x to touch-pan-y and added overscroll-contain */}
+      <div className="flex gap-4 overflow-x-auto pb-8 no-scrollbar touch-pan-y overscroll-contain cursor-grab active:cursor-grabbing snap-x">
         {screenshots.map((shot, index) => (
           <div 
             key={index} 
