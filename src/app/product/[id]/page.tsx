@@ -10,7 +10,7 @@ interface Product {
   description?: string;
   image?: string;
   slug?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 type Props = {
