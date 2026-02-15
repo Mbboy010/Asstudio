@@ -10,15 +10,15 @@ interface Product {
   description?: string;
   image?: string;
   slug?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // Allows for other dynamic firestore fields
+  [key: string]: any;
 }
 
 type Props = {
-  params: Promise<{ id: string }>;
+  params: { id: string }; // ✅ FIXED
 };
 
-const stripHtml = (html: string) => html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
+const stripHtml = (html: string) =>
+  html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
 
 async function getProduct(id: string): Promise<Product | null> {
   try {
@@ -47,15 +47,22 @@ async function getProduct(id: string): Promise<Product | null> {
   }
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
+export async function generateMetadata(
+  { params }: Props
+): Promise<Metadata> {
+  const { id } = params; // ✅ removed await
   const product = await getProduct(id);
 
-  if (!product) return { title: 'Product Not Found' };
+  if (!product) {
+    return { title: 'Product Not Found' };
+  }
 
   const title = `${product.name || 'Product'} | AS Studio`;
-  const description = stripHtml(product.description || 'Exclusive digital assets.');
-  const imageUrl = product.image || 'https://asbeatcloud.vercel.app/og-default.jpg';
+  const description = stripHtml(
+    product.description || 'Exclusive digital assets.'
+  );
+  const imageUrl =
+    product.image || 'https://asbeatcloud.vercel.app/og-default.jpg';
 
   return {
     title,
@@ -76,14 +83,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
-  const { id } = await params;
+  const { id } = params; // ✅ removed await
   const product = await getProduct(id);
 
-  if (!product) notFound();
+  if (!product) {
+    notFound();
+  }
 
   return (
     <main>
-      <ProductDetailContent />
+      <ProductDetailContent  />
     </main>
   );
 }
