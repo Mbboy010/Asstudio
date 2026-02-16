@@ -1,28 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react'; 
-import { motion } from 'framer-motion';
-import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter, CheckCircle, XCircle } from 'lucide-react';
 import { Product, ProductCategory } from '@/types';
 import { ProductSkeleton } from '@/components/ui/Skeleton';
-import { useDispatch, useSelector } from 'react-redux';
-import { addToCart, setError, RootState } from '@/store';
+// Removed Redux imports
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
+// Added setDoc, doc to write to cart directly
+import { collection, getDocs, query, orderBy, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
-import { sendEmailVerification } from 'firebase/auth';
+import { sendEmailVerification, onAuthStateChanged, User } from 'firebase/auth';
 
 const ITEMS_PER_PAGE = 12;
 
 const ShopContent: React.FC = () => {
-  const dispatch = useDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useSelector((state: RootState) => state.auth);
+
+  // 1. Local User State (Replacing Redux Auth Selector)
+  const [user, setUser] = useState<User | null>(null);
+  
+  // 2. Local Notification State (Replacing Redux setError)
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   const [loading, setLoading] = useState(true);
-
   const selectedCategory = searchParams?.get('category') ?? 'All';
   const urlSearchTerm = searchParams?.get('search') ?? '';
 
@@ -31,15 +34,26 @@ const ShopContent: React.FC = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // FIX: Removed the "getCookie" useEffect that was forcing old search terms into the URL.
-  // Now, the search only depends on the actual URL parameters.
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // Sync local search term with URL changes (e.g., when clicking "Clear Filters")
+  // Notification Helper
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Sync local search term
   useEffect(() => {
     setLocalSearchTerm(urlSearchTerm);
   }, [urlSearchTerm]);
 
-  // Debounce logic: Update URL when user stops typing
+  // Debounce logic
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearchTerm !== urlSearchTerm) {
@@ -49,15 +63,12 @@ const ShopContent: React.FC = () => {
         } else {
           params.delete('search');
         }
-        // Using replace so we don't clog the history stack while typing
         router.replace(`/shop?${params.toString()}`);
       }
     }, 500);
     return () => clearTimeout(timer);
   }, [localSearchTerm, searchParams, router, urlSearchTerm]);
 
-  // FIX: Added cleanup effect to clear search term if user leaves the shop
-  // This ensures that internal state is strictly tied to the current lifecycle
   useEffect(() => {
     return () => {
       setLocalSearchTerm(''); 
@@ -78,80 +89,117 @@ const ShopContent: React.FC = () => {
       const err = error as { code?: string; message?: string };
       console.error("Error fetching products: ", err);
       if (err.code === 'permission-denied' || err.message?.includes('disabled')) {
-         dispatch(setError("Failed to load products."));
+         showNotification('error', "Failed to load products.");
       }
     } finally {
       setLoading(false);
     }
-  }, [dispatch]);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
   const checkAuthAndVerification = async () => {
-    if (!user) {
+    if (!auth.currentUser) {
         router.push('/login');
         return false;
     }
     const currentUser = auth.currentUser;
-    if (currentUser) {
-        try { await currentUser.reload(); } catch(e) { console.error("User reload failed", e); }
-        if (!currentUser.emailVerified) {
-            try {
-                await sendEmailVerification(currentUser);
-                dispatch(setError(`Account not verified. A link has been sent to ${currentUser.email}.`));
-            } catch (error: unknown) {
-                 const err = error as { code?: string; message?: string };
-                 if (err.code === 'auth/too-many-requests') {
-                     dispatch(setError("Verification email already sent. Check your inbox."));
-                 } else {
-                     dispatch(setError(err.message || "Verification failed."));
-                 }
-            }
-            return false;
+    
+    // Reload user to get latest verification status
+    try { await currentUser.reload(); } catch(e) { console.error("User reload failed", e); }
+    
+    if (!currentUser.emailVerified) {
+        try {
+            await sendEmailVerification(currentUser);
+            showNotification('error', `Account not verified. Link sent to ${currentUser.email}.`);
+        } catch (error: unknown) {
+              const err = error as { code?: string; message?: string };
+              if (err.code === 'auth/too-many-requests') {
+                  showNotification('error', "Verification email already sent.");
+              } else {
+                  showNotification('error', "Verification failed.");
+              }
         }
-    } else {
-         dispatch(setError("Session invalid. Please log in again."));
-         router.push('/login');
-         return false;
+        return false;
     }
     return true;
   };
 
+  // --- REPLACED REDUX CART WITH FIRESTORE ---
   const handleAddToCart = async (product: Product) => {
       const allowed = await checkAuthAndVerification();
-      if (allowed) {
-          dispatch(addToCart(product));
+      
+      // Ensure we have a user object before writing to DB
+      const currentUser = auth.currentUser;
+      
+      if (allowed && currentUser) {
+          try {
+            // Write directly to users/{uid}/cart/{productId}
+            const cartItemRef = doc(db, 'users', currentUser.uid, 'cart', product.id);
+            
+            await setDoc(cartItemRef, {
+                ...product,
+                quantity: 1, // Defaulting to 1 for "Add to Cart" button
+                addedAt: new Date().toISOString()
+            });
+
+            showNotification('success', `${product.name} added to cart!`);
+          } catch (error) {
+            console.error("Add to cart failed:", error);
+            showNotification('error', "Failed to add item to cart.");
+          }
       }
   };
 
-  const handleDownload = async (product: Product) => {
-    const allowed = await checkAuthAndVerification();
-    if (!allowed) return;
+  // --- HANDLE DOWNLOAD (Direct Database Logic) ---
+  const handleDownload = async (product: Product, isDemo: boolean = false) => {
+    const isFree = product?.price === 0;
+    const needsAuth = !isDemo && !isFree;
+
+    if (needsAuth) {
+      const allowed = await checkAuthAndVerification();
+      if (!allowed) return;
+    }
+
     setDownloadingId(product.id);
+    
     try {
-        await addDoc(collection(db, "orders"), {
-            userId: user?.id,
-            userEmail: user?.email,
+      const currentUser = auth.currentUser;
+
+      // Record free order only if user is logged in
+      if (!isDemo && isFree && currentUser && product) {
+        try {
+          await addDoc(collection(db, "orders"), {
+            userId: currentUser.uid,
+            userEmail: currentUser.email,
             items: [{...product, quantity: 1}],
             total: 0,
             status: 'Completed',
             createdAt: new Date().toISOString()
-        });
-        const element = document.createElement("a");
-        const fileContent = `Product: ${product.name}\nLicense: Royalty-Free`;
-        const file = new Blob([fileContent], {type: 'text/plain'});
-        element.href = URL.createObjectURL(file);
-        element.download = `${product.name.replace(/\s+/g, '_')}_License.txt`;
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
-    } catch (error: unknown) {
-        console.error("Download error:", error);
-        dispatch(setError("Failed to process download."));
+          });
+        } catch (e) {
+          console.error("Background order recording failed:", e);
+        }
+      }
+
+      // Trigger Download
+      // Note: Assuming Product type has productUrl/demoUrl. Casting to any if strict type missing.
+      const p = product as any;
+      if (isDemo && p?.demoUrl) {
+        window.open(p.demoUrl, '_blank');
+      } else if (!isDemo && p?.productUrl) {
+        window.open(p.productUrl, '_blank');
+      } else {
+        showNotification('error', "Download link missing.");
+      }
+      
+    } catch (error) {
+      console.error("Download action failed:", error);
+      showNotification('error', "Download failed.");
     } finally {
-        setDownloadingId(null);
+      setDownloadingId(null);
     }
   };
 
@@ -192,7 +240,24 @@ const ShopContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300">
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300 relative">
+      
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold ${
+              notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`}
+          >
+            {notification.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <XCircle className="w-5 h-5"/>}
+            {notification.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
       <motion.div 
