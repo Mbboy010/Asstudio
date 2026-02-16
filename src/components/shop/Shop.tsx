@@ -5,26 +5,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter, CheckCircle, XCircle } from 'lucide-react';
 import { Product, ProductCategory } from '@/types';
 import { ProductSkeleton } from '@/components/ui/Skeleton';
-// Removed Redux imports
 import Link from 'next/link';
+import Image from 'next/image'; // 1. Added Next.js Image component
 import { useRouter, useSearchParams } from 'next/navigation';
-// Added setDoc, doc to write to cart directly
 import { collection, getDocs, query, orderBy, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
-import { sendEmailVerification, onAuthStateChanged, User } from 'firebase/auth';
+import { sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
 
 const ITEMS_PER_PAGE = 12;
+
+// 2. Define an interface for Product that includes optional download URLs 
+// to avoid using 'any'
+interface DownloadableProduct extends Product {
+  demoUrl?: string;
+  productUrl?: string;
+}
 
 const ShopContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 1. Local User State (Replacing Redux Auth Selector)
-  const [user, setUser] = useState<User | null>(null);
-  
-  // 2. Local Notification State (Replacing Redux setError)
+  // Removed unused 'user' state to clear linting warning
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
-
   const [loading, setLoading] = useState(true);
   const selectedCategory = searchParams?.get('category') ?? 'All';
   const urlSearchTerm = searchParams?.get('search') ?? '';
@@ -34,26 +36,23 @@ const ShopContent: React.FC = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Auth Listener
+  // Auth Listener (Simplified)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      // Logic for user state if needed later
     });
     return () => unsubscribe();
   }, []);
 
-  // Notification Helper
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Sync local search term
   useEffect(() => {
     setLocalSearchTerm(urlSearchTerm);
   }, [urlSearchTerm]);
 
-  // Debounce logic
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearchTerm !== urlSearchTerm) {
@@ -69,12 +68,6 @@ const ShopContent: React.FC = () => {
     return () => clearTimeout(timer);
   }, [localSearchTerm, searchParams, router, urlSearchTerm]);
 
-  useEffect(() => {
-    return () => {
-      setLocalSearchTerm(''); 
-    };
-  }, []);
-
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -86,11 +79,8 @@ const ShopContent: React.FC = () => {
       });
       setProducts(fetchedProducts);
     } catch (error: unknown) {
-      const err = error as { code?: string; message?: string };
-      console.error("Error fetching products: ", err);
-      if (err.code === 'permission-denied' || err.message?.includes('disabled')) {
-         showNotification('error', "Failed to load products.");
-      }
+      console.error("Error fetching products: ", error);
+      showNotification('error', "Failed to load products.");
     } finally {
       setLoading(false);
     }
@@ -106,17 +96,14 @@ const ShopContent: React.FC = () => {
         return false;
     }
     const currentUser = auth.currentUser;
-    
-    // Reload user to get latest verification status
     try { await currentUser.reload(); } catch(e) { console.error("User reload failed", e); }
     
     if (!currentUser.emailVerified) {
         try {
             await sendEmailVerification(currentUser);
             showNotification('error', `Account not verified. Link sent to ${currentUser.email}.`);
-        } catch (error: unknown) {
-              const err = error as { code?: string; message?: string };
-              if (err.code === 'auth/too-many-requests') {
+        } catch (error: any) {
+              if (error.code === 'auth/too-many-requests') {
                   showNotification('error', "Verification email already sent.");
               } else {
                   showNotification('error', "Verification failed.");
@@ -127,24 +114,18 @@ const ShopContent: React.FC = () => {
     return true;
   };
 
-  // --- REPLACED REDUX CART WITH FIRESTORE ---
   const handleAddToCart = async (product: Product) => {
       const allowed = await checkAuthAndVerification();
-      
-      // Ensure we have a user object before writing to DB
       const currentUser = auth.currentUser;
       
       if (allowed && currentUser) {
           try {
-            // Write directly to users/{uid}/cart/{productId}
             const cartItemRef = doc(db, 'users', currentUser.uid, 'cart', product.id);
-            
             await setDoc(cartItemRef, {
                 ...product,
-                quantity: 1, // Defaulting to 1 for "Add to Cart" button
+                quantity: 1,
                 addedAt: new Date().toISOString()
             });
-
             showNotification('success', `${product.name} added to cart!`);
           } catch (error) {
             console.error("Add to cart failed:", error);
@@ -153,7 +134,6 @@ const ShopContent: React.FC = () => {
       }
   };
 
-  // --- HANDLE DOWNLOAD (Direct Database Logic) ---
   const handleDownload = async (product: Product, isDemo: boolean = false) => {
     const isFree = product?.price === 0;
     const needsAuth = !isDemo && !isFree;
@@ -168,7 +148,6 @@ const ShopContent: React.FC = () => {
     try {
       const currentUser = auth.currentUser;
 
-      // Record free order only if user is logged in
       if (!isDemo && isFree && currentUser && product) {
         try {
           await addDoc(collection(db, "orders"), {
@@ -184,9 +163,8 @@ const ShopContent: React.FC = () => {
         }
       }
 
-      // Trigger Download
-      // Note: Assuming Product type has productUrl/demoUrl. Casting to any if strict type missing.
-      const p = product as any;
+      // 3. FIXED: Cast to DownloadableProduct instead of 'any'
+      const p = product as DownloadableProduct;
       if (isDemo && p?.demoUrl) {
         window.open(p.demoUrl, '_blank');
       } else if (!isDemo && p?.productUrl) {
@@ -242,7 +220,6 @@ const ShopContent: React.FC = () => {
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300 relative">
       
-      {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
           <motion.div
@@ -259,7 +236,6 @@ const ShopContent: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
       <motion.div 
          initial={{ opacity: 0, y: -20 }}
          whileInView={{ opacity: 1, y: 0 }}
@@ -273,7 +249,7 @@ const ShopContent: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
            <div className="relative w-full sm:w-auto">
-             <Search className="absolute left-3 top-3.5 text-gray-400 w-5 h-5 transition-colors" />
+             <Search className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
              <input 
                type="text" 
                placeholder="Search plugins, packs..." 
@@ -302,7 +278,6 @@ const ShopContent: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 min-h-[600px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
@@ -317,10 +292,12 @@ const ShopContent: React.FC = () => {
             >
               <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
-                   <img 
+                   // 4. FIXED: Replaced <img> with optimized <Image />
+                   <Image 
                     src={product.image} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                    alt={product.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-700" 
                    />
                 ) : (
                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
@@ -401,7 +378,6 @@ const ShopContent: React.FC = () => {
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-16 flex justify-center items-center gap-2">
             <button 
