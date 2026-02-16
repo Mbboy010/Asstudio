@@ -102,13 +102,15 @@ const ShopContent: React.FC = () => {
         try {
             await sendEmailVerification(currentUser);
             showNotification('error', `Account not verified. Link sent to ${currentUser.email}.`);
-        } catch (error: any) {
-              if (error.code === 'auth/too-many-requests') {
-                  showNotification('error', "Verification email already sent.");
-              } else {
-                  showNotification('error', "Verification failed.");
-              }
-        }
+          } catch (error: unknown) {
+                const firebaseError = error as { code?: string }; // Cast the type here instead
+                if (firebaseError.code === 'auth/too-many-requests') {
+                    showNotification('error', "Verification email already sent.");
+                } else {
+                    showNotification('error', "Verification failed.");
+                }
+          }
+
         return false;
     }
     return true;
