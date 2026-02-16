@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   ShoppingBag, Sun, Moon, Menu, X, LogOut, ShieldAlert, 
-  Search, LayoutDashboard, Settings, Clock, ArrowUpLeft, User as UserIcon
+  Search, LayoutDashboard, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db } from '../firebase';
 import { 
-  onSnapshot, collection, query, where, getDocs, 
+  onSnapshot, collection, query, getDocs, 
   addDoc, orderBy, limit, serverTimestamp, deleteDoc, doc 
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
@@ -112,46 +112,47 @@ export const Navbar: React.FC = () => {
 
   // 4. Live Search Logic
   useEffect(() => {
-  const fetchProducts = async () => {
-    // 1. Only search if there are 2+ characters
-    if (searchQuery.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    const fetchProducts = async () => {
+      // 1. Only search if there are 2+ characters
+      if (searchQuery.trim().length < 2) {
+        setSearchResults([]);
+        return;
+      }
 
-    try {
-      const productsRef = collection(db, "products");
-      
-      // 2. Fetch products (you can add a limit here to save on reads)
-      // Note: In a large database, you'd fetch a 'search_index' collection instead
-      const snapshot = await getDocs(productsRef);
-      
-      const searchTerms = searchQuery.toLowerCase().split(' '); // Split query into words
+      try {
+        const productsRef = collection(db, "products");
+        
+        // 2. Fetch products (you can add a limit here to save on reads)
+        const snapshot = await getDocs(productsRef);
+        
+        const searchTerms = searchQuery.toLowerCase().split(' '); // Split query into words
 
-      const results = snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        .filter(product => {
-          const productName = product.name.toLowerCase();
-          // 3. Check if EVERY word in the search query exists somewhere in the product name
-          return searchTerms.every(term => productName.includes(term));
-        })
-        .slice(0, 5); // 4. Limit to top 5 results for the dropdown
+        const results = snapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            name: doc.data().name,
+            category: doc.data().category,
+            image: doc.data().image
+          } as ProductResult))
+          .filter(product => {
+            const productName = product.name.toLowerCase();
+            // 3. Check if EVERY word in the search query exists somewhere in the product name
+            return searchTerms.every(term => productName.includes(term));
+          })
+          .slice(0, 5); // 4. Limit to top 5 results for the dropdown
 
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Error fetching search results:", error);
-    }
-  };
+        setSearchResults(results);
+      } catch (error) {
+        console.error("Error fetching search results:", error);
+      }
+    };
 
-  const delayDebounceFn = setTimeout(() => {
-    fetchProducts();
-  }, 300);
+    const delayDebounceFn = setTimeout(() => {
+      fetchProducts();
+    }, 300);
 
-  return () => clearTimeout(delayDebounceFn);
-}, [searchQuery]);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
 
   // Focus input when opened
@@ -254,6 +255,7 @@ export const Navbar: React.FC = () => {
                 {user ? (
                   <div className="relative ml-2">
                     <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-0.5 rounded-full border-2 border-rose-500 hover:scale-105 transition-transform">
+                      {/* Using img tag to avoid domain config issues with Next/Image during build */}
                       <img 
                         src={user?.avatar ?? `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} 
                         className="w-8 h-8 rounded-full object-cover" 
@@ -324,7 +326,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* --- SEARCH DROPDOWN (Google Play Style) --- */}
+        {/* --- SEARCH DROPDOWN --- */}
         <AnimatePresence>
           {isSearchOpen && (
             <motion.div 
@@ -420,7 +422,8 @@ export const Navbar: React.FC = () => {
                   {/* 3. Empty State */}
                   {searchQuery.trim().length > 1 && searchResults.length === 0 && (
                      <div className="text-center py-10 text-gray-500">
-                       <p className="text-sm">No results found for "{searchQuery}"</p>
+                       {/* FIXED: Escaped quotes below to prevent build failure */}
+                       <p className="text-sm">No results found for &quot;{searchQuery}&quot;</p>
                      </div>
                   )}
                 </div>
