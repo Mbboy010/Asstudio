@@ -8,29 +8,12 @@ import { ProductSkeleton } from '@/components/ui/Skeleton';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, setError, RootState } from '@/store';
 import Link from 'next/link';
-// Note: You can remove the 'import Image from "next/image"' if you aren't using it elsewhere
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { sendEmailVerification } from 'firebase/auth';
 
 const ITEMS_PER_PAGE = 12;
-
-// Cookie Helpers
-const setCookie = (name: string, value: string, days: number) => {
-  if (typeof document !== 'undefined') {
-    const expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-  }
-};
-
-const getCookie = (name: string) => {
-  if (typeof document === 'undefined') return '';
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return decodeURIComponent(parts.pop()?.split(';').shift() || '');
-  return '';
-};
 
 const ShopContent: React.FC = () => {
   const dispatch = useDispatch();
@@ -48,42 +31,38 @@ const ShopContent: React.FC = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    const cookieSearch = getCookie('asstudio_search');
-    const urlSearch = searchParams?.get('search');
+  // FIX: Removed the "getCookie" useEffect that was forcing old search terms into the URL.
+  // Now, the search only depends on the actual URL parameters.
 
-    if (urlSearch) {
-        if (urlSearch !== cookieSearch) {
-            setCookie('asstudio_search', urlSearch, 30);
-        }
-    } else if (cookieSearch) {
-        setLocalSearchTerm(cookieSearch);
-        const params = new URLSearchParams(searchParams?.toString() ?? '');
-        params.set('search', cookieSearch);
-        router.replace(`/shop?${params.toString()}`);
-    }
-  }, [router, searchParams]);
-
+  // Sync local search term with URL changes (e.g., when clicking "Clear Filters")
   useEffect(() => {
     setLocalSearchTerm(urlSearchTerm);
   }, [urlSearchTerm]);
 
+  // Debounce logic: Update URL when user stops typing
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearchTerm !== urlSearchTerm) {
         const params = new URLSearchParams(searchParams?.toString() ?? '');
         if (localSearchTerm) {
           params.set('search', localSearchTerm);
-          setCookie('asstudio_search', localSearchTerm, 30);
         } else {
           params.delete('search');
-          setCookie('asstudio_search', '', -1);
         }
+        // Using replace so we don't clog the history stack while typing
         router.replace(`/shop?${params.toString()}`);
       }
     }, 500);
     return () => clearTimeout(timer);
   }, [localSearchTerm, searchParams, router, urlSearchTerm]);
+
+  // FIX: Added cleanup effect to clear search term if user leaves the shop
+  // This ensures that internal state is strictly tied to the current lifecycle
+  useEffect(() => {
+    return () => {
+      setLocalSearchTerm(''); 
+    };
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -115,13 +94,9 @@ const ShopContent: React.FC = () => {
         router.push('/login');
         return false;
     }
-
     const currentUser = auth.currentUser;
     if (currentUser) {
-        try {
-            await currentUser.reload();
-        } catch(e) { console.error("User reload failed", e); }
-
+        try { await currentUser.reload(); } catch(e) { console.error("User reload failed", e); }
         if (!currentUser.emailVerified) {
             try {
                 await sendEmailVerification(currentUser);
@@ -154,7 +129,6 @@ const ShopContent: React.FC = () => {
   const handleDownload = async (product: Product) => {
     const allowed = await checkAuthAndVerification();
     if (!allowed) return;
-
     setDownloadingId(product.id);
     try {
         await addDoc(collection(db, "orders"), {
@@ -165,7 +139,6 @@ const ShopContent: React.FC = () => {
             status: 'Completed',
             createdAt: new Date().toISOString()
         });
-
         const element = document.createElement("a");
         const fileContent = `Product: ${product.name}\nLicense: Royalty-Free`;
         const file = new Blob([fileContent], {type: 'text/plain'});
@@ -174,7 +147,6 @@ const ShopContent: React.FC = () => {
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
-
     } catch (error: unknown) {
         console.error("Download error:", error);
         dispatch(setError("Failed to process download."));
@@ -216,7 +188,6 @@ const ShopContent: React.FC = () => {
   const handleResetFilters = () => {
     router.push('/shop');
     setLocalSearchTerm('');
-    setCookie('asstudio_search', '', -1);
     fetchProducts();
   };
 
@@ -281,7 +252,6 @@ const ShopContent: React.FC = () => {
             >
               <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
-                   /* UPDATED: Changed from Next.js Image to standard img tag */
                    <img 
                     src={product.image} 
                     alt={product.name} 
