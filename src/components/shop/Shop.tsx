@@ -37,12 +37,12 @@ const ShopContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.auth);
-  
+
   const [loading, setLoading] = useState(true);
-  
+
   const selectedCategory = searchParams?.get('category') ?? 'All';
   const urlSearchTerm = searchParams?.get('search') ?? '';
-  
+
   const [localSearchTerm, setLocalSearchTerm] = useState(urlSearchTerm);
   const [products, setProducts] = useState<Product[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -115,7 +115,7 @@ const ShopContent: React.FC = () => {
         router.push('/login');
         return false;
     }
-    
+
     const currentUser = auth.currentUser;
     if (currentUser) {
         try {
@@ -154,7 +154,7 @@ const ShopContent: React.FC = () => {
   const handleDownload = async (product: Product) => {
     const allowed = await checkAuthAndVerification();
     if (!allowed) return;
-    
+
     setDownloadingId(product.id);
     try {
         await addDoc(collection(db, "orders"), {
@@ -222,7 +222,7 @@ const ShopContent: React.FC = () => {
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300">
-      
+
       {/* Header */}
       <motion.div 
          initial={{ opacity: 0, y: -20 }}
@@ -234,7 +234,7 @@ const ShopContent: React.FC = () => {
            <h1 className="text-4xl font-black text-gray-900 dark:text-white mb-2 uppercase">Explore Sounds</h1>
            <p className="text-gray-500 font-medium">Over {products.length}+ premium tools available.</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
            <div className="relative w-full sm:w-auto">
              <Search className="absolute left-3 top-3.5 text-gray-400 w-5 h-5 transition-colors" />
@@ -246,7 +246,7 @@ const ShopContent: React.FC = () => {
                className="pl-10 pr-4 py-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl w-full sm:w-64 focus:ring-2 focus:ring-rose-500 outline-none transition-all shadow-sm"
              />
            </div>
-           
+
            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto no-scrollbar">
              {['All', ...Object.values(ProductCategory)].map(cat => (
                <button
@@ -292,7 +292,7 @@ const ShopContent: React.FC = () => {
                       <ImageIcon className="w-12 h-12 opacity-50" />
                    </div>
                 )}
-                
+
                 <div className="absolute top-3 left-3">
                     {product.category === ProductCategory.VST_PLUGIN && (
                         <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded border border-white/10 uppercase tracking-wider flex items-center gap-1">
@@ -300,7 +300,7 @@ const ShopContent: React.FC = () => {
                         </div>
                     )}
                 </div>
-                
+
                 {product.price === 0 && (
                      <div className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
                         Free
@@ -313,7 +313,7 @@ const ShopContent: React.FC = () => {
                    </div>
                 </div>
               </Link>
-              
+
               <div className="p-5 flex flex-col flex-grow">
                  <div className="flex justify-between items-start mb-3">
                    <div className="flex-1 pr-2 overflow-hidden">
@@ -330,7 +330,7 @@ const ShopContent: React.FC = () => {
                       {product.price === 0 ? 'FREE' : `₦${product.price}`}
                    </span>
                  </div>
-                 
+
                  <div className="mt-auto pt-4 border-t border-gray-100 dark:border-zinc-800">
                     {product.price === 0 ? (
                         <button 
