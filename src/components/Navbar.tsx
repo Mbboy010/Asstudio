@@ -59,6 +59,37 @@ export const Navbar: React.FC = () => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [cartCount, setCartCount] = useState(0);
 
+  // --- Fixed Handlers for Mutual Exclusivity ---
+
+  const toggleSearch = () => {
+    if (!isSearchOpen) {
+      // Opening search: close everything else
+      setIsMobileMenuOpen(false);
+      setIsCartOpen(false);
+      setIsProfileOpen(false);
+    } else {
+      // Closing search: clear input per request
+      setSearchQuery('');
+    }
+    setIsSearchOpen(!isSearchOpen);
+  };
+
+  const toggleMobileMenu = () => {
+    if (!isMobileMenuOpen) {
+      setIsSearchOpen(false);
+      setIsCartOpen(false);
+      setIsProfileOpen(false);
+    }
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const openCart = () => {
+    setIsSearchOpen(false);
+    setIsMobileMenuOpen(false);
+    setIsProfileOpen(false);
+    setIsCartOpen(true);
+  };
+
   useEffect(() => { setMounted(true); }, []);
 
   // 1. Auth Listener
@@ -74,7 +105,7 @@ export const Navbar: React.FC = () => {
         });
       } else {
         setUser(null);
-        setSearchHistory([]); // Clear history on logout
+        setSearchHistory([]); 
       }
     });
     return () => unsubAuth();
@@ -93,10 +124,9 @@ export const Navbar: React.FC = () => {
     return () => unsubCart();
   }, [user?.id]);
 
-  // 3. Fetch Search History (Only if logged in)
+  // 3. Search History Listener
   useEffect(() => {
     if (!user?.id) return;
-    
     const historyRef = collection(db, "users", user.id, "search_history");
     const q = query(historyRef, orderBy("createdAt", "desc"), limit(5));
 
@@ -110,10 +140,9 @@ export const Navbar: React.FC = () => {
     return () => unsubHistory();
   }, [user?.id]);
 
-  // 4. Live Search Logic
+  // 4. Live Search Logic (Debounced)
   useEffect(() => {
     const fetchProducts = async () => {
-      // 1. Only search if there are 2+ characters
       if (searchQuery.trim().length < 2) {
         setSearchResults([]);
         return;
@@ -121,11 +150,8 @@ export const Navbar: React.FC = () => {
 
       try {
         const productsRef = collection(db, "products");
-        
-        // 2. Fetch products (you can add a limit here to save on reads)
         const snapshot = await getDocs(productsRef);
-        
-        const searchTerms = searchQuery.toLowerCase().split(' '); // Split query into words
+        const searchTerms = searchQuery.toLowerCase().split(' ');
 
         const results = snapshot.docs
           .map(doc => ({
@@ -136,10 +162,9 @@ export const Navbar: React.FC = () => {
           } as ProductResult))
           .filter(product => {
             const productName = product.name.toLowerCase();
-            // 3. Check if EVERY word in the search query exists somewhere in the product name
             return searchTerms.every(term => productName.includes(term));
           })
-          .slice(0, 5); // 4. Limit to top 5 results for the dropdown
+          .slice(0, 5);
 
         setSearchResults(results);
       } catch (error) {
@@ -154,15 +179,13 @@ export const Navbar: React.FC = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-
-  // Focus input when opened
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [isSearchOpen]);
 
-  // --- Handlers ---
+  // --- Search Actions ---
 
   const saveSearchTerm = async (term: string) => {
     if (!user?.id || !term.trim()) return;
@@ -190,16 +213,16 @@ export const Navbar: React.FC = () => {
     executeSearch(searchQuery);
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setIsProfileOpen(false);
-    router.push('/');
-  };
-
   const removeHistoryItem = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     if (!user?.id) return;
     await deleteDoc(doc(db, "users", user.id, "search_history", itemId));
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setIsProfileOpen(false);
+    router.push('/');
   };
 
   if (!mounted) return null;
@@ -210,7 +233,6 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
 
-            {/* LOGO */}
             <Link href="/" className="flex items-center gap-2 group flex-shrink-0 z-50">
               <div className="w-10 h-10 flex items-center justify-center bg-black dark:bg-zinc-900 rounded-lg border border-rose-500/30 group-hover:border-rose-500 transition-colors">
                 <span className="text-rose-600 font-black text-xl">A</span>
@@ -220,29 +242,19 @@ export const Navbar: React.FC = () => {
 
             {/* DESKTOP NAV */}
             <div className="hidden md:flex items-center justify-end flex-1 gap-6">
-              
               <Link href="/shop" className={`text-xs font-bold uppercase hover:text-rose-600 transition-colors ${pathname === '/shop' ? 'text-rose-600' : 'text-gray-600 dark:text-gray-400'}`}>
                 Shop
               </Link>
 
-              {/* ICONS CONTAINER */}
               <div className="flex items-center gap-3 border-l border-gray-200 dark:border-zinc-800 pl-6">
-                
-                {/* 1. SEARCH ICON (Left of Cart) */}
                 <button 
-                  onClick={() => setIsSearchOpen(!isSearchOpen)}
+                  onClick={toggleSearch}
                   className={`p-2 rounded-full transition-colors ${isSearchOpen ? 'bg-gray-100 dark:bg-zinc-800 text-rose-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}
-                  aria-label="Search"
                 >
                   {isSearchOpen ? <X size={20} /> : <Search size={20} />}
                 </button>
 
-                {/* 2. CART ICON */}
-                <button 
-                  onClick={() => setIsCartOpen(true)} 
-                  className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-400 transition-colors"
-                  aria-label="Open Cart"
-                >
+                <button onClick={openCart} className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-600 dark:text-gray-400 transition-colors">
                   <ShoppingBag size={20} />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
@@ -251,50 +263,30 @@ export const Navbar: React.FC = () => {
                   )}
                 </button>
 
-                {/* 3. PROFILE DROPDOWN */}
                 {user ? (
                   <div className="relative ml-2">
                     <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="p-0.5 rounded-full border-2 border-rose-500 hover:scale-105 transition-transform">
-                      {/* Using img tag to avoid domain config issues with Next/Image during build */}
-                      <img 
-                        src={user?.avatar ?? `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} 
-                        className="w-8 h-8 rounded-full object-cover" 
-                        alt="Profile"
-                      />
+                      <img src={user?.avatar ?? `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}`} className="w-8 h-8 rounded-full object-cover" alt="Profile" />
                     </button>
-                    
-                    {/* PROFILE MENU */}
                     <AnimatePresence>
                       {isProfileOpen && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-64 bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl py-3 border border-gray-100 dark:border-zinc-800 z-50">
-                          {/* User Info */}
                           <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 mb-2">
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{user.displayName || 'User'}</p>
                             <p className="text-xs text-gray-500 truncate">{user.email}</p>
                           </div>
-                          
-                          {/* Theme Toggle */}
-                          <button 
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-zinc-900 text-gray-700 dark:text-zinc-300 transition-colors"
-                          >
+                          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-full flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-zinc-900 text-gray-700 dark:text-zinc-300">
                             {theme === 'dark' ? <Sun size={16} className="text-orange-500" /> : <Moon size={16} className="text-blue-500" />}
                             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                           </button>
-
-                          {/* Dashboard Link */}
                           <Link href="/dashboard" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-zinc-900 text-gray-700 dark:text-zinc-300">
                             <LayoutDashboard size={16}/> User Dashboard
                           </Link>
-
-                          {/* Admin Link (Conditional) */}
                           {user.role === 'admin' && (
                             <Link href="/mb/admin" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-3 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/10 font-semibold">
                               <ShieldAlert size={16}/> Admin Panel
                             </Link>
                           )}
-                          
-                          {/* Logout */}
                           <div className="mt-2 pt-2 border-t border-gray-100 dark:border-zinc-800">
                             <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
                               <LogOut size={16}/> Sign out
@@ -312,14 +304,14 @@ export const Navbar: React.FC = () => {
 
             {/* MOBILE HEADER ACTIONS */}
             <div className="flex md:hidden items-center gap-2">
-              <button onClick={() => setIsSearchOpen(!isSearchOpen)} className="p-2 text-gray-900 dark:text-white">
-                 <Search size={24} />
+              <button onClick={toggleSearch} className="p-2 text-gray-900 dark:text-white">
+                 {isSearchOpen ? <X size={24} className="text-rose-600" /> : <Search size={24} />}
               </button>
-              <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-900 dark:text-white">
+              <button onClick={openCart} className="relative p-2 text-gray-900 dark:text-white">
                 <ShoppingBag size={24} />
                 {cartCount > 0 && <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-rose-600 text-[10px] text-white flex items-center justify-center font-bold">{cartCount}</span>}
               </button>
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-900 dark:text-white">
+              <button onClick={toggleMobileMenu} className="p-2 text-gray-900 dark:text-white">
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
@@ -329,14 +321,8 @@ export const Navbar: React.FC = () => {
         {/* --- SEARCH DROPDOWN --- */}
         <AnimatePresence>
           {isSearchOpen && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="absolute top-20 left-0 w-full bg-white dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800 shadow-2xl z-40 overflow-hidden"
-            >
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="absolute top-20 left-0 w-full bg-white dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800 shadow-2xl z-40 overflow-hidden">
               <div className="max-w-4xl mx-auto p-4">
-                {/* Search Input */}
                 <div className="relative flex items-center bg-gray-100 dark:bg-zinc-900 rounded-xl px-4 py-3 mb-4">
                   <Search className="text-gray-400 w-5 h-5 mr-3" />
                   <form onSubmit={handleSearchSubmit} className="flex-1">
@@ -356,9 +342,7 @@ export const Navbar: React.FC = () => {
                   )}
                 </div>
 
-                {/* Results Area */}
-                <div className="max-h-[60vh] overflow-y-auto px-2">
-                  
+                <div className="max-h-[60vh] overflow-y-auto px-2 pb-4">
                   {/* 1. Live Suggestions */}
                   {searchQuery.trim().length > 0 && searchResults.length > 0 && (
                     <div className="mb-6">
@@ -409,7 +393,6 @@ export const Navbar: React.FC = () => {
                             <button 
                               onClick={(e) => removeHistoryItem(e, item.id)} 
                               className="text-gray-300 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
-                              title="Remove from history"
                             >
                               <X size={14} />
                             </button>
@@ -422,7 +405,6 @@ export const Navbar: React.FC = () => {
                   {/* 3. Empty State */}
                   {searchQuery.trim().length > 1 && searchResults.length === 0 && (
                      <div className="text-center py-10 text-gray-500">
-                       {/* FIXED: Escaped quotes below to prevent build failure */}
                        <p className="text-sm">No results found for &quot;{searchQuery}&quot;</p>
                      </div>
                   )}
@@ -439,7 +421,6 @@ export const Navbar: React.FC = () => {
                <div className="px-4 pt-2 pb-6 space-y-1">
                  <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900">Home</Link>
                  <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900">Shop</Link>
-                 
                  {user && (
                    <>
                      <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-4 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900">Dashboard</Link>
@@ -448,16 +429,10 @@ export const Navbar: React.FC = () => {
                      )}
                    </>
                  )}
-
-                 {/* Mobile Theme Toggle */}
-                 <button 
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="w-full flex items-center gap-2 px-3 py-4 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900"
-                  >
+                 <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="w-full flex items-center gap-2 px-3 py-4 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900">
                     {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                     {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                  </button>
-
                  {user ? (
                    <button onClick={handleLogout} className="w-full text-left px-3 py-4 text-red-500 font-bold">Sign Out</button>
                  ) : (
@@ -469,7 +444,6 @@ export const Navbar: React.FC = () => {
         </AnimatePresence>
       </nav>
 
-      {/* --- CART DRAWER COMPONENT --- */}
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </>
   );
