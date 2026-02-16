@@ -182,7 +182,7 @@ export const Navbar: React.FC = () => {
     setSearchQuery('');
     setIsSearchOpen(false);
     setIsMobileMenuOpen(false);
-    router.push(`/shop?q=${encodeURIComponent(term)}`);
+    window.location.href = "/shop?q=" + encodeURIComponent(term);
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -365,7 +365,7 @@ export const Navbar: React.FC = () => {
                       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Top Suggestions</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {searchResults.map((result) => (
-                          <Link 
+                          <a 
                             key={result.id} 
                             href={`/product/${result.id}`} 
                             onClick={() => {
@@ -385,7 +385,7 @@ export const Navbar: React.FC = () => {
                               <p className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-rose-600 transition-colors line-clamp-1">{result.name}</p>
                               <p className="text-xs text-gray-500">{result.category || 'Asset'}</p>
                             </div>
-                          </Link>
+                          </a>
                         ))}
                       </div>
                     </div>
