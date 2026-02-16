@@ -112,41 +112,47 @@ export const Navbar: React.FC = () => {
 
   // 4. Live Search Logic
   useEffect(() => {
-    const fetchProducts = async () => {
-      if (searchQuery.trim().length < 2) {
-        setSearchResults([]);
-        return;
-      }
+  const fetchProducts = async () => {
+    // 1. Only search if there are 2+ characters
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
 
-      // Basic prefix match search
+    try {
       const productsRef = collection(db, "products");
-      const q = query(
-        productsRef, 
-        where("name", ">=", searchQuery), 
-        where("name", "<=", searchQuery + '\uf8ff'),
-        limit(5)
-      );
+      
+      // 2. Fetch products (you can add a limit here to save on reads)
+      // Note: In a large database, you'd fetch a 'search_index' collection instead
+      const snapshot = await getDocs(productsRef);
+      
+      const searchTerms = searchQuery.toLowerCase().split(' '); // Split query into words
 
-      try {
-        const snapshot = await getDocs(q);
-        const results = snapshot.docs.map(doc => ({
+      const results = snapshot.docs
+        .map(doc => ({
           id: doc.id,
-          name: doc.data().name,
-          category: doc.data().category,
-          image: doc.data().image
-        }));
-        setSearchResults(results);
-      } catch (error) {
-        console.error("Error fetching search results:", error);
-      }
-    };
+          ...doc.data()
+        }))
+        .filter(product => {
+          const productName = product.name.toLowerCase();
+          // 3. Check if EVERY word in the search query exists somewhere in the product name
+          return searchTerms.every(term => productName.includes(term));
+        })
+        .slice(0, 5); // 4. Limit to top 5 results for the dropdown
 
-    const delayDebounceFn = setTimeout(() => {
-      fetchProducts();
-    }, 300);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Error fetching search results:", error);
+    }
+  };
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  const delayDebounceFn = setTimeout(() => {
+    fetchProducts();
+  }, 300);
+
+  return () => clearTimeout(delayDebounceFn);
+}, [searchQuery]);
+
 
   // Focus input when opened
   useEffect(() => {
