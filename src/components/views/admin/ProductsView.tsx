@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Edit2, Trash2, Image as ImageIcon, X, Upload, Save, 
-  Loader, Music, ZoomIn, ZoomOut, Tag, DollarSign
+  Loader, Music, ZoomIn, ZoomOut, Tag, DollarSign, Calendar, HardDrive
 } from 'lucide-react';
 import { ProductCategory, Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RichTextEditor } from '@/components/ui/RichTextEditor';
+// Change this import to point to where you saved the editor from the previous answer
+import DescriptionEditor from './DescriptionEditor'; 
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { storage, BUCKET_ID, ID } from '@/appwrite'; 
@@ -24,19 +25,22 @@ const AdminProductsView: React.FC = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<Product>>({
+  
+  // Extended State including new fields
+  const [formData, setFormData] = useState<Partial<Product> & { fileSize?: string, releaseDate?: string, tagsInput?: string }>({
     name: '',
     category: ProductCategory.SAMPLE_PACK,
     price: 0,
     description: '',
     image: '',
-    features: [],
-    size: '',
+    features: [], // You might want to map tags to this or a new field
+    fileSize: '', 
+    releaseDate: new Date().toISOString().split('T')[0],
+    tagsInput: '', // Helper state for comma-separated tags
     rating: 5.0,
     uploadDate: new Date().toISOString().split('T')[0],
     productUrl: '',
     demoUrl: '',
-    downloadType: 'file'
   });
 
   // Crop State
@@ -75,7 +79,16 @@ const AdminProductsView: React.FC = () => {
 
   const handleEdit = (product: Product) => {
     setEditingId(product.id);
-    setFormData(product);
+    
+    // Convert array of tags to comma-separated string for editing
+    const tagsString = product.tags ? product.tags.join(', ') : '';
+    
+    setFormData({
+      ...product,
+      tagsInput: tagsString,
+      fileSize: product.fileSize || '',
+      releaseDate: product.releaseDate || product.uploadDate,
+    });
     setProductFile(null);
     setAudioFile(null);
     setIsModalOpen(true);
@@ -92,12 +105,13 @@ const AdminProductsView: React.FC = () => {
       description: '',
       image: '',
       features: [],
-      size: '',
+      fileSize: '',
+      tagsInput: '',
+      releaseDate: new Date().toISOString().split('T')[0],
       rating: 5.0,
       uploadDate: new Date().toISOString().split('T')[0],
       productUrl: '',
       demoUrl: '',
-      downloadType: 'file'
     });
     setIsModalOpen(true);
   };
@@ -114,7 +128,6 @@ const AdminProductsView: React.FC = () => {
   const uploadToAppwrite = async (file: File) => {
     try {
       const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-      // Ensure we get a valid view URL
       const fileUrl = storage.getFileView(BUCKET_ID, response.$id);
       return fileUrl.toString();
     } catch (error) {
@@ -130,31 +143,41 @@ const AdminProductsView: React.FC = () => {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
 
-      // Handle Product File Upload
-      if (productFile && formData.downloadType === 'file') {
+      if (productFile) {
         finalProductUrl = await uploadToAppwrite(productFile);
       }
 
-      // Handle Audio Demo Upload
       if (audioFile) {
         finalDemoUrl = await uploadToAppwrite(audioFile);
       }
 
+      // Process tags
+      const processedTags = formData.tagsInput 
+        ? formData.tagsInput.split(',').map(t => t.trim()).filter(t => t !== '') 
+        : [];
+
       const submissionData = {
-        ...formData,
-        price: Number(formData.price), // Ensure price is a number
+        name: formData.name,
+        category: formData.category,
+        description: formData.description,
+        image: formData.image,
+        price: Number(formData.price),
         productUrl: finalProductUrl || '',
-        demoUrl: finalDemoUrl || '', // Ensure empty string if no demo
-        uploadDate: new Date().toISOString().split('T')[0]
+        demoUrl: finalDemoUrl || '',
+        uploadDate: new Date().toISOString().split('T')[0],
+        // New Fields
+        fileSize: formData.fileSize,
+        releaseDate: formData.releaseDate,
+        tags: processedTags,
       };
 
       if (editingId) {
         await updateDoc(doc(db, "products", editingId), submissionData);
       } else {
-        await addDoc(collection(db, "products"), { ...submissionData, sales: 0 });
+        await addDoc(collection(db, "products"), { ...submissionData, sales: 0, rating: 5.0 });
       }
       
-      await fetchProducts(); // Wait for fetch
+      await fetchProducts();
       setIsModalOpen(false);
     } catch (error) {
       console.error(error);
@@ -162,7 +185,7 @@ const AdminProductsView: React.FC = () => {
     } finally { setIsSaving(false); }
   };
 
-  // --- Cropping Logic (Unchanged but kept for completeness) ---
+  // --- Cropping Logic ---
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -259,10 +282,6 @@ const AdminProductsView: React.FC = () => {
                   <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {product.category}</span>
                   <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {product.sales || 0} Sales</span>
                 </div>
-                {/* Admin Visual check for Demo URL */}
-                <div className="text-[10px] text-gray-400">
-                    {product.demoUrl ? "Has Audio Demo" : "No Audio Demo"}
-                </div>
               </div>
             </div>
           ))}
@@ -274,7 +293,7 @@ const AdminProductsView: React.FC = () => {
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-5xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-20">
                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">{editingId ? 'Edit Product' : 'New Product'}</h2>
                  <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-6 h-6" /></button>
@@ -282,9 +301,9 @@ const AdminProductsView: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto p-6">
                   <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Left Column: Media */}
-                      <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                      {/* Left Column: Media (Width 4/12) */}
+                      <div className="md:col-span-4 space-y-6">
                          <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cover Art</label>
                             <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-300 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800/50 group">
@@ -294,25 +313,17 @@ const AdminProductsView: React.FC = () => {
                             </div>
                          </div>
 
-                         {/* Product File Section */}
+                         {/* Product File Section (Simplified - Removed Toggle) */}
                          <div className="bg-gray-50 dark:bg-zinc-800/50 p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                             <div className="flex items-center justify-between">
-                               <span className="font-bold text-sm">Product File (Appwrite)</span>
-                               <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-lg">
-                                  <button type="button" onClick={() => setFormData({...formData, downloadType: 'file'})} className={`px-3 py-1 text-xs rounded-md font-bold transition-all ${formData.downloadType === 'file' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500'}`}>File</button>
-                                  <button type="button" onClick={() => setFormData({...formData, downloadType: 'link'})} className={`px-3 py-1 text-xs rounded-md font-bold transition-all ${formData.downloadType === 'link' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500'}`}>Link</button>
-                               </div>
+                               <span className="font-bold text-sm">Product File</span>
                             </div>
                             
-                            {formData.downloadType === 'file' ? (
-                                <div onClick={() => productFileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-900/10 cursor-pointer">
-                                    <input type="file" ref={productFileInputRef} className="hidden" onChange={(e) => setProductFile(e.target.files?.[0] || null)} />
-                                    <Upload className="w-6 h-6 text-gray-400 mb-1" />
-                                    <span className="text-xs font-bold text-gray-500">{productFile ? productFile.name : 'Select ZIP/RAR file'}</span>
-                                </div>
-                            ) : (
-                                <input type="url" placeholder="Direct Download Link" value={formData.productUrl || ''} onChange={e => setFormData({...formData, productUrl: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm" />
-                            )}
+                            <div onClick={() => productFileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-900/10 cursor-pointer">
+                                <input type="file" ref={productFileInputRef} className="hidden" onChange={(e) => setProductFile(e.target.files?.[0] || null)} />
+                                <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                                <span className="text-xs font-bold text-gray-500">{productFile ? productFile.name : 'Select ZIP/RAR file'}</span>
+                            </div>
                          </div>
 
                          {/* Audio Demo Section */}
@@ -327,12 +338,14 @@ const AdminProductsView: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Right Column: Details */}
-                      <div className="space-y-6">
+                      {/* Right Column: Details (Width 8/12) */}
+                      <div className="md:col-span-8 space-y-6">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Product Name</label>
                           <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 font-bold focus:border-rose-500 outline-none" placeholder="Sample Pack Name" />
                         </div>
+                        
+                        {/* Price & Category */}
                         <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-2">
                              <label className="text-sm font-bold">Price (₦)</label>
@@ -345,9 +358,45 @@ const AdminProductsView: React.FC = () => {
                              </select>
                            </div>
                         </div>
+
+                        {/* NEW FIELDS: File Size, Release Date, Tags */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold flex items-center gap-2"><HardDrive className="w-4 h-4 text-gray-400"/> File Size</label>
+                                <input 
+                                    placeholder="e.g. 1.2 GB"
+                                    value={formData.fileSize || ''} 
+                                    onChange={e => setFormData({...formData, fileSize: e.target.value})} 
+                                    className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400"/> Release Date</label>
+                                <input 
+                                    type="date"
+                                    value={formData.releaseDate || ''} 
+                                    onChange={e => setFormData({...formData, releaseDate: e.target.value})} 
+                                    className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold flex items-center gap-2"><Tag className="w-4 h-4 text-gray-400"/> Tags</label>
+                                <input 
+                                    placeholder="Techno, Drums, Loop"
+                                    value={formData.tagsInput || ''} 
+                                    onChange={e => setFormData({...formData, tagsInput: e.target.value})} 
+                                    className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm" 
+                                />
+                            </div>
+                        </div>
+
+                        {/* Description Editor */}
                         <div className="space-y-2 flex flex-col">
                           <label className="text-sm font-bold">Description</label>
-                          <RichTextEditor value={formData.description || ''} onChange={(val) => setFormData({...formData, description: val})} className="min-h-[200px] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl" />
+                          <DescriptionEditor 
+                             value={formData.description || ''} 
+                             onChange={(val) => setFormData({...formData, description: val})} 
+                          />
                         </div>
                       </div>
                     </div>
