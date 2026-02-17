@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+// Added Image from next/image
+import Image from 'next/image'; 
 import { Upload as UploadIcon, X, FileAudio, Image as ImageIcon, Check, Loader, CloudUpload, Info, Calendar, HardDrive, Link as LinkIcon, Music, ZoomIn, ZoomOut, Plus, Layers } from 'lucide-react';
 import { ProductCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-// --- CHANGED: Imported the new Editor ---
 import DescriptionEditor from './DescriptionEditor'; 
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -77,7 +78,6 @@ const AdminUploadView: React.FC = () => {
     }
   };
 
-  // --- Handlers for Product File ---
   const handleProductDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') setIsProductDragActive(true);
@@ -94,7 +94,6 @@ const AdminUploadView: React.FC = () => {
     }
   };
 
-  // --- Handlers for Demo File ---
   const handleDemoDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') setIsDemoDragActive(true);
@@ -114,7 +113,6 @@ const AdminUploadView: React.FC = () => {
     }
   };
 
-  // --- Handlers for Screenshots ---
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
         const newFiles = Array.from(e.target.files);
@@ -130,7 +128,6 @@ const AdminUploadView: React.FC = () => {
     setScreenshotPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  // --- Crop Logic ---
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -268,24 +265,20 @@ const AdminUploadView: React.FC = () => {
       let finalProductUrl = productUrl;
       let finalDemoUrl = demoUrl;
 
-      // 1. Upload Product File
       if (productType === 'file' && productFile) {
         finalProductUrl = await uploadToAppwrite(productFile);
       }
 
-      // 2. Upload Demo Audio
       if (demoType === 'file' && demoFile) {
         finalDemoUrl = await uploadToAppwrite(demoFile);
       }
 
-      // 3. Upload Screenshots
       const screenshotUrls = await Promise.all(
         screenshotFiles.map(file => uploadToAppwrite(file))
       );
 
       const finalCoverUrl = coverPreview;
 
-      // 4. Save to Firestore
       await addDoc(collection(db, "products"), {
         name: formData.name,
         category: formData.category,
@@ -306,7 +299,6 @@ const AdminUploadView: React.FC = () => {
 
       alert("Product successfully published!");
 
-      // Reset State
       setProductFile(null); setProductUrl('');
       setDemoFile(null); setDemoUrl('');
       setScreenshotFiles([]); setScreenshotPreviews([]);
@@ -319,13 +311,12 @@ const AdminUploadView: React.FC = () => {
 
     } catch (error) {
       console.error("Error uploading product:", error);
-      alert("Failed to upload. Please ensure your Appwrite bucket allows these file types.");
+      alert("Failed to upload. Please check your connection.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  // --- RENDER ---
   return (
     <div className="bg-gray-50 dark:bg-black min-h-screen py-6 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -343,10 +334,8 @@ const AdminUploadView: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            {/* Left Column: Content */}
             <div className="lg:col-span-2 space-y-6">
 
-            {/* 1. Product Source Section */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg">
@@ -421,7 +410,6 @@ const AdminUploadView: React.FC = () => {
                 )}
             </div>
 
-            {/* 2. Audio Demo Section */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg">
@@ -492,7 +480,6 @@ const AdminUploadView: React.FC = () => {
                 )}
             </div>
 
-            {/* 3. Screenshots Upload Section */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg mb-6">
                     <Layers className="w-5 h-5 text-rose-600" /> Product Screenshots
@@ -529,11 +516,16 @@ const AdminUploadView: React.FC = () => {
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-zinc-700"
                                     >
-                                        <img src={src} alt={`Screenshot ${index}`} className="w-full h-full object-cover" />
+                                        <Image 
+                                          src={src} 
+                                          alt={`Screenshot ${index}`} 
+                                          fill
+                                          className="object-cover" 
+                                        />
                                         <button 
                                             type="button"
                                             onClick={() => removeScreenshot(index)}
-                                            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -545,7 +537,6 @@ const AdminUploadView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Product Information */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm space-y-8">
                 <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg">
                     <Info className="w-5 h-5 text-rose-600" /> Product Details
@@ -566,12 +557,11 @@ const AdminUploadView: React.FC = () => {
 
                     <div className="space-y-2.5 flex flex-col h-full min-h-[300px]">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Description</label>
-                        {/* --- CHANGED: Implemented DescriptionEditor --- */}
                         <div className="flex-1 rounded-xl overflow-hidden focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all z-10">
+                            {/* REMOVED invalid onToast prop */}
                             <DescriptionEditor 
                                 value={formData.description}
                                 onChange={(val) => setFormData({...formData, description: val})}
-                                onToast={(msg, type) => alert(`${type.toUpperCase()}: ${msg}`)}
                             />
                         </div>
                     </div>
@@ -590,9 +580,7 @@ const AdminUploadView: React.FC = () => {
             </div>
             </div>
 
-            {/* Right Column: Metadata & Settings */}
             <div className="space-y-6">
-            {/* Cover Image */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 shadow-sm">
                 <h3 className="font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                     <ImageIcon className="w-5 h-5 text-rose-600" /> Cover Art
@@ -604,8 +592,13 @@ const AdminUploadView: React.FC = () => {
                     <input ref={coverInputRef} type="file" className="hidden" onChange={handleCoverChange} accept="image/*" />
                     {coverPreview ? (
                         <>
-                        <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold transition-all backdrop-blur-sm">
+                        <Image 
+                          src={coverPreview} 
+                          alt="Cover" 
+                          fill
+                          className="object-cover" 
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold transition-all backdrop-blur-sm z-10">
                             <UploadIcon className="w-5 h-5 mr-2" /> Change Image
                         </div>
                         </>
@@ -620,7 +613,6 @@ const AdminUploadView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Technical Metadata */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 space-y-5 shadow-sm">
                 <h3 className="font-bold text-xs uppercase tracking-widest text-gray-400">Technical Specs</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -646,7 +638,6 @@ const AdminUploadView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Pricing & Category */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 space-y-6 shadow-sm">
                 <h3 className="font-bold text-xs uppercase tracking-widest text-gray-400">Publishing</h3>
 
@@ -681,7 +672,6 @@ const AdminUploadView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Submit */}
             <button 
                 type="submit" 
                 disabled={isUploading}
@@ -717,7 +707,7 @@ const AdminUploadView: React.FC = () => {
                 >
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2"><UploadIcon className="w-6 h-6 text-rose-600" /> Adjust Image</h3>
-                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); coverInputRef.current!.value = ''; }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500">
+                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (coverInputRef.current) coverInputRef.current.value = ''; }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -734,16 +724,20 @@ const AdminUploadView: React.FC = () => {
                             onTouchMove={handleMouseMove}
                             onTouchEnd={handleMouseUp}
                         >
-                            <img 
-                                ref={cropImgRef}
+                            <Image 
                                 src={cropImgSrc}
-                                onLoad={handleImageLoad}
                                 alt="Crop Preview"
+                                width={imgDimensions.width || 800}
+                                height={imgDimensions.height || 800}
                                 draggable={false}
                                 className="absolute max-w-none origin-top-left pointer-events-none select-none"
                                 style={{
                                     transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
                                     transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                }}
+                                onLoadingComplete={(img) => {
+                                  // Re-calculate dimensions if needed via naturalWidth
+                                  setImgDimensions({ width: img.naturalWidth, height: img.naturalHeight });
                                 }}
                             />
                         </div>
@@ -767,7 +761,7 @@ const AdminUploadView: React.FC = () => {
 
                         <div className="flex gap-3">
                             <button 
-                                onClick={() => { setIsCropOpen(false); setCropImgSrc(null); coverInputRef.current!.value = ''; }}
+                                onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (coverInputRef.current) coverInputRef.current.value = ''; }}
                                 className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                             >
                                 Cancel
