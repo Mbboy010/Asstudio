@@ -23,6 +23,9 @@ export interface Product {
   features?: string[];
   isNew?: boolean;
   size?: string;
+  tags?: string[];
+  fileSize?: string;
+  releaseDate?: string;
   uploadDate?: string;
 }
 
