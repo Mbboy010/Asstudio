@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Bold, Underline, Italic, AlignLeft, AlignCenter, AlignRight,
   Link as LinkIcon, Minus, Video, Type, X, ChevronDown, 
-  Palette, List, ListOrdered, Undo, Redo, Plus, Check, Ban
+  Palette, List, ListOrdered, Undo, Redo, Plus, Ban
 } from 'lucide-react';
 
 // --- Interfaces ---
@@ -13,10 +13,11 @@ interface DescriptionEditorProps {
   onChange: (value: string) => void;
 }
 
-// --- Helper: Hex to RGB ---
-const hexToRgb = (hex: string) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : '';
+interface ToolBtnProps {
+  icon: React.ElementType;
+  action: () => void;
+  active?: boolean;
+  label?: string;
 }
 
 const COLORS = ['#ffffff', '#ef4444', '#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#64748b'];
@@ -40,12 +41,12 @@ export default function DescriptionEditor({ value, onChange }: DescriptionEditor
     foreColor: DEFAULT_TEXT_COLOR,
   });
 
-  // Sync initial value
+  // Sync initial value - Added 'value' to dependencies to fix React Hook warning
   useEffect(() => {
     if (editorRef.current && value && editorRef.current.innerHTML === '') {
       editorRef.current.innerHTML = value;
     }
-  }, []);
+  }, [value]);
 
   // Click Outside Listener
   useEffect(() => {
@@ -110,7 +111,8 @@ export default function DescriptionEditor({ value, onChange }: DescriptionEditor
     setActiveMenu(null);
   };
 
-  const ToolBtn = ({ icon: Icon, action, active = false, label }: any) => (
+  // Fixed 'any' type error by using ToolBtnProps interface
+  const ToolBtn = ({ icon: Icon, action, active = false, label }: ToolBtnProps) => (
     <button
       type="button"
       onMouseDown={(e) => { e.preventDefault(); action(); }}
