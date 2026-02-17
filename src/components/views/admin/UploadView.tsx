@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload as UploadIcon, X, FileAudio, Image as ImageIcon, Check, Loader, CloudUpload, Info, Calendar, HardDrive, Link as LinkIcon, Music, ZoomIn, ZoomOut, Save, Plus, Layers } from 'lucide-react';
+import { Upload as UploadIcon, X, FileAudio, Image as ImageIcon, Check, Loader, CloudUpload, Info, Calendar, HardDrive, Link as LinkIcon, Music, ZoomIn, ZoomOut, Plus, Layers } from 'lucide-react';
 import { ProductCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RichTextEditor } from '@/components/ui/RichTextEditor';
+// --- CHANGED: Imported the new Editor ---
+import DescriptionEditor from './DescriptionEditor'; 
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -15,7 +16,7 @@ const CROP_SIZE = 400;
 
 const AdminUploadView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
-  
+
   // Product File State
   const [productType, setProductType] = useState<'file' | 'link'>('file');
   const [productFile, setProductFile] = useState<File | null>(null);
@@ -30,8 +31,8 @@ const AdminUploadView: React.FC = () => {
 
   // Cover Image State
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  
-  // Screenshot State (NEW)
+
+  // Screenshot State
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
   const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([]);
   const screenshotInputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +47,7 @@ const AdminUploadView: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isProcessingCrop, setIsProcessingCrop] = useState(false);
-  
+
   const cropImgRef = useRef<HTMLImageElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,12 +114,12 @@ const AdminUploadView: React.FC = () => {
     }
   };
 
-  // --- Handlers for Screenshots (NEW) ---
+  // --- Handlers for Screenshots ---
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
         const newFiles = Array.from(e.target.files);
         const newPreviews = newFiles.map(file => URL.createObjectURL(file));
-        
+
         setScreenshotFiles(prev => [...prev, ...newFiles]);
         setScreenshotPreviews(prev => [...prev, ...newPreviews]);
     }
@@ -153,7 +154,7 @@ const AdminUploadView: React.FC = () => {
 
       const scale = Math.max(CROP_SIZE / naturalWidth, CROP_SIZE / naturalHeight);
       setBaseScale(scale);
-      
+
       const renderedWidth = naturalWidth * scale;
       const renderedHeight = naturalHeight * scale;
       setCropOffset({
@@ -173,7 +174,7 @@ const AdminUploadView: React.FC = () => {
       if (!isDragging) return;
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-      
+
       const rawX = clientX - dragStart.x;
       const rawY = clientY - dragStart.y;
 
@@ -218,13 +219,13 @@ const AdminUploadView: React.FC = () => {
   const handleSaveCrop = async () => {
       if (!cropImgRef.current) return;
       setIsProcessingCrop(true);
-      
+
       try {
         const canvas = document.createElement('canvas');
         canvas.width = CROP_SIZE;
         canvas.height = CROP_SIZE;
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) return;
 
         ctx.fillStyle = '#FFFFFF';
@@ -233,12 +234,12 @@ const AdminUploadView: React.FC = () => {
         const img = cropImgRef.current;
         const renderedWidth = img.naturalWidth * baseScale * cropZoom;
         const renderedHeight = img.naturalHeight * baseScale * cropZoom;
-        
+
         ctx.drawImage(img, cropOffset.x, cropOffset.y, renderedWidth, renderedHeight);
-        
+
         let quality = 0.9;
         let dataUrl = await compressImage(canvas, quality);
-        
+
         while (dataUrl.length > 68000 && quality > 0.1) {
             quality -= 0.1;
             dataUrl = await compressImage(canvas, quality);
@@ -277,12 +278,11 @@ const AdminUploadView: React.FC = () => {
         finalDemoUrl = await uploadToAppwrite(demoFile);
       }
 
-      // 3. Upload Screenshots (NEW)
-      // Upload all screenshots concurrently and get their URLs
+      // 3. Upload Screenshots
       const screenshotUrls = await Promise.all(
         screenshotFiles.map(file => uploadToAppwrite(file))
       );
-      
+
       const finalCoverUrl = coverPreview;
 
       // 4. Save to Firestore
@@ -297,15 +297,15 @@ const AdminUploadView: React.FC = () => {
         uploadDate: formData.uploadDate,
         features: formData.tags.split(',').map(s => s.trim()).filter(Boolean),
         image: finalCoverUrl,
-        screenshots: screenshotUrls, // Save array of URLs
-        
+        screenshots: screenshotUrls, 
+
         downloadType: productType,
         productUrl: finalProductUrl || null,
         demoUrl: finalDemoUrl || null
       });
 
       alert("Product successfully published!");
-      
+
       // Reset State
       setProductFile(null); setProductUrl('');
       setDemoFile(null); setDemoUrl('');
@@ -329,7 +329,7 @@ const AdminUploadView: React.FC = () => {
   return (
     <div className="bg-gray-50 dark:bg-black min-h-screen py-6 transition-colors duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
-        
+
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-gray-200 dark:border-zinc-800 pb-6">
             <div className="p-3 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-500 rounded-xl">
@@ -342,10 +342,10 @@ const AdminUploadView: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
+
             {/* Left Column: Content */}
             <div className="lg:col-span-2 space-y-6">
-            
+
             {/* 1. Product Source Section */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
@@ -365,7 +365,7 @@ const AdminUploadView: React.FC = () => {
                         >External Link</button>
                     </div>
                 </div>
-                
+
                 {productType === 'file' ? (
                     <div 
                         className={`relative h-48 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center cursor-pointer overflow-hidden ${
@@ -382,7 +382,7 @@ const AdminUploadView: React.FC = () => {
                                 setFormData(prev => ({...prev, size: (e.target.files![0].size / (1024*1024)).toFixed(2) + ' MB'}));
                             }
                         }} accept=".zip,.rar,.vst,.dmg,.exe" />
-                        
+
                         {productFile ? (
                             <div className="flex flex-col items-center z-10">
                                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-500 rounded-full flex items-center justify-center mb-3 shadow-sm">
@@ -454,7 +454,7 @@ const AdminUploadView: React.FC = () => {
                         <input ref={demoInputRef} type="file" className="hidden" onChange={(e) => {
                             if (e.target.files?.[0]) setDemoFile(e.target.files[0]);
                         }} accept="audio/*" />
-                        
+
                         {demoFile ? (
                             <div className="flex flex-col items-center z-10">
                                 <div className="flex items-center gap-2 mb-2">
@@ -492,12 +492,12 @@ const AdminUploadView: React.FC = () => {
                 )}
             </div>
 
-            {/* 3. Screenshots Upload Section (NEW) */}
+            {/* 3. Screenshots Upload Section */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg mb-6">
                     <Layers className="w-5 h-5 text-rose-600" /> Product Screenshots
                 </h3>
-                
+
                 <div className="space-y-4">
                     <div 
                         onClick={() => screenshotInputRef.current?.click()}
@@ -550,7 +550,7 @@ const AdminUploadView: React.FC = () => {
                 <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg">
                     <Info className="w-5 h-5 text-rose-600" /> Product Details
                 </h3>
-                
+
                 <div className="space-y-6">
                     <div className="space-y-2.5">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Product Name</label>
@@ -563,15 +563,15 @@ const AdminUploadView: React.FC = () => {
                         className="w-full bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 transition-all font-bold text-lg" 
                         />
                     </div>
-                    
+
                     <div className="space-y-2.5 flex flex-col h-full min-h-[300px]">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Description</label>
-                        <div className="flex-1 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all">
-                            <RichTextEditor 
+                        {/* --- CHANGED: Implemented DescriptionEditor --- */}
+                        <div className="flex-1 rounded-xl overflow-hidden focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all z-10">
+                            <DescriptionEditor 
                                 value={formData.description}
                                 onChange={(val) => setFormData({...formData, description: val})}
-                                placeholder="Describe your product features..."
-                                className="min-h-[250px] p-4 bg-gray-50 dark:bg-zinc-800/30"
+                                onToast={(msg, type) => alert(`${type.toUpperCase()}: ${msg}`)}
                             />
                         </div>
                     </div>
@@ -649,7 +649,7 @@ const AdminUploadView: React.FC = () => {
             {/* Pricing & Category */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 space-y-6 shadow-sm">
                 <h3 className="font-bold text-xs uppercase tracking-widest text-gray-400">Publishing</h3>
-                
+
                 <div className="space-y-2.5">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Price (₦)</label>
                     <div className="relative">
@@ -700,7 +700,7 @@ const AdminUploadView: React.FC = () => {
             </div>
         </form>
 
-      {/* Crop Modal (Keep as is) */}
+      {/* Crop Modal */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <motion.div 
