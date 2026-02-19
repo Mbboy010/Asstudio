@@ -724,22 +724,18 @@ const AdminUploadView: React.FC = () => {
                             onTouchMove={handleMouseMove}
                             onTouchEnd={handleMouseUp}
                         >
-                            <Image 
-                                src={cropImgSrc}
-                                alt="Crop Preview"
-                                width={imgDimensions.width || 800}
-                                height={imgDimensions.height || 800}
-                                draggable={false}
-                                className="absolute max-w-none origin-top-left pointer-events-none select-none"
-                                style={{
-                                    transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
-                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                }}
-                                onLoadingComplete={(img) => {
-                                  // Re-calculate dimensions if needed via naturalWidth
-                                  setImgDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-                                }}
-                            />
+<img
+    ref={cropImgRef}
+    src={cropImgSrc}
+    alt="Crop Preview"
+    draggable={false}
+    onLoad={handleImageLoad}
+    className="absolute max-w-none origin-top-left pointer-events-none select-none"
+    style={{
+        transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
+        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+    }}
+/>
                         </div>
                     </div>
 
