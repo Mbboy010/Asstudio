@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import AdminManageContentView from '@/components/views/admin/ManageContentView';
+import AdminManageView from '@/components/views/admin/ManageContentView';
 
 export const metadata: Metadata = {
   title: "Manage Content | Asstudio Admin",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminManageContentPage() {
-  return <AdminManageContentView />;
+  return <AdminManageView />;
 }
