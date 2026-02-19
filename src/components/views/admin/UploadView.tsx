@@ -10,6 +10,13 @@ import DescriptionEditor from './DescriptionEditor';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
+import { v4 as uuidv4 } from 'uuid';
+
+
+
+
+
+
 // --- APPWRITE IMPORTS ---
 import { storage, BUCKET_ID, ID } from '@/appwrite'; 
 
@@ -63,7 +70,7 @@ const AdminUploadView: React.FC = () => {
     rating: '5.0',
     uploadDate: new Date().toISOString().split('T')[0]
   });
-
+  const iduu = uuidv4();
   const productInputRef = useRef<HTMLInputElement>(null);
   const demoInputRef = useRef<HTMLInputElement>(null);
 
@@ -276,26 +283,34 @@ const AdminUploadView: React.FC = () => {
       const screenshotUrls = await Promise.all(
         screenshotFiles.map(file => uploadToAppwrite(file))
       );
-
+      
+      function replaceWhiteWithDash(str: string): string {
+            return str.replace(/\s+/g, '-');
+          }
+                
       const finalCoverUrl = coverPreview;
-
-      await addDoc(collection(db, "products"), {
+      const dataId = `${replaceWhiteWithDash{formData.name}}-${iduu}`
+      
+      await setDoc(doc(collection(db, "products"), dataId), {
         name: formData.name,
         category: formData.category,
         price: Number(formData.price),
         description: formData.description,
-        size: formData.size || 'N/A',
+        size: formData.size || "N/A",
         rating: Number(formData.rating),
         sales: 0,
         uploadDate: formData.uploadDate,
-        features: formData.tags.split(',').map(s => s.trim()).filter(Boolean),
+        features: formData.tags
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
         image: finalCoverUrl,
-        screenshots: screenshotUrls, 
-
+        screenshots: screenshotUrls,
         downloadType: productType,
         productUrl: finalProductUrl || null,
-        demoUrl: finalDemoUrl || null
+        demoUrl: finalDemoUrl || null,
       });
+
 
       alert("Product successfully published!");
 
