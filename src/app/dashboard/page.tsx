@@ -7,10 +7,11 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2, LucideIcon, HeartOff, ChevronRight
+  User, Shield, Trash2, LucideIcon, HeartOff 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
+// UPDATED: Replaced arrayRemove with deleteDoc for subcollection removal
 import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -53,12 +54,14 @@ const UserDashboardContent: React.FC = () => {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   
+  // Favorites States
   const [favoriteItems, setFavoriteItems] = useState<LibraryItem[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
   
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [displayName, setDisplayName] = useState(user?.name || '');
 
+  // Crop State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [cropImgSrc, setCropImgSrc] = useState<string | null>(null);
@@ -74,25 +77,37 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
-  // --- Logic remains completely unchanged ---
+  // --- 1. UPDATED: Fetch Favorites from Subcollection Real-time ---
   useEffect(() => {
     if (!user?.id) return;
     setLoadingFavorites(true);
+
     const favColRef = collection(db, "users", user.id, "favorites");
+    
     const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
+        // Map document IDs from the subcollection
         const favoriteIds = snapshot.docs.map(doc => doc.id);
+
         if (favoriteIds.length === 0) {
             setFavoriteItems([]);
             setLoadingFavorites(false);
             return;
         }
+
         try {
+            // Resolve all IDs to full product objects
             const favDetails = await Promise.all(
                 favoriteIds.map(async (prodId: string) => {
                     const productSnap = await getDoc(doc(db, 'products', prodId));
                     if (productSnap.exists()) {
                         const pData = productSnap.data();
-                        return { id: prodId, name: pData.name || 'Unknown Product', image: pData.image || '', category: pData.category || 'Uncategorized', isDeleted: false };
+                        return {
+                            id: prodId,
+                            name: pData.name || 'Unknown Product',
+                            image: pData.image || '',
+                            category: pData.category || 'Uncategorized',
+                            isDeleted: false
+                        };
                     }
                     return { id: prodId, name: 'Item Unavailable', image: '', category: 'N/A', isDeleted: true };
                 })
@@ -104,49 +119,80 @@ const UserDashboardContent: React.FC = () => {
             setLoadingFavorites(false);
         }
     });
+
     return () => unsubscribe();
   }, [user?.id]);
 
+  // --- 2. Fetch Raw Orders Snapshot ---
   useEffect(() => {
     if (!user) return;
     setLoadingOrders(true);
+
     const q = query(collection(db, "orders"), where("userId", "==", user.id));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
         try {
             const fetchedOrders = snapshot.docs.map(doc => {
                 const data = doc.data();
-                return { id: doc.id, createdAt: data.createdAt, status: data.status, total: data.total, items: data.items || [] };
+                return {
+                    id: doc.id,
+                    createdAt: data.createdAt,
+                    status: data.status,
+                    total: data.total,
+                    items: data.items || [] 
+                };
             }) as RawOrderItem[];
+            
             fetchedOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             setRawOrders(fetchedOrders);
             if (fetchedOrders.length === 0) setLoadingOrders(false);
-        } catch (err) { setLoadingOrders(false); }
-    }, (error) => { setLoadingOrders(false); });
+        } catch (err) {
+            setLoadingOrders(false);
+        }
+    }, (error) => {
+        setLoadingOrders(false);
+    });
+
     return () => unsubscribe();
   }, [user]);
 
+  // --- 3. Enrich Orders with Live Product Data ---
   useEffect(() => {
     const enrichOrders = async () => {
         if (rawOrders.length === 0) return;
+        
         try {
             const productIds = new Set<string>();
             rawOrders.forEach(order => order.items?.forEach(item => productIds.add(item.id)));
-            const productsData: Record<string, any> = {};
+
+            const productsData: Record<string, {   name?: string;   image?: string;   category?: string;   demoUrl?: string;   productUrl?: string; } | null> = {};
             await Promise.all(
                 Array.from(productIds).map(async (id) => {
                     const productSnap = await getDoc(doc(db, 'products', id));
                     productsData[id] = productSnap.exists() ? productSnap.data() : null;
                 })
             );
+
             const enrichedOrders: OrderItem[] = rawOrders.map(order => ({
                 ...order,
                 items: (order.items || []).map(item => {
                     const productInfo = productsData[item.id];
                     if (!productInfo) return { id: item.id, name: 'Data is deleted', image: '', category: 'Unavailable', orderDate: item.savedAt || order.createdAt, isDeleted: true };
-                    return { id: item.id, name: productInfo.name || 'Unknown', image: productInfo.image || '', category: productInfo.category || 'N/A', productUrl: productInfo.demoUrl || productInfo.productUrl, orderDate: item.savedAt || order.createdAt, isDeleted: false };
+
+                    return {
+                        id: item.id,
+                        name: productInfo.name || 'Unknown',
+                        image: productInfo.image || '',
+                        category: productInfo.category || 'N/A',
+                        productUrl: productInfo.demoUrl || productInfo.productUrl,
+                        orderDate: item.savedAt || order.createdAt,
+                        isDeleted: false
+                    };
                 })
             }));
+
             setOrders(enrichedOrders);
+
             const allItems: LibraryItem[] = [];
             const seenIds = new Set();
             enrichedOrders.forEach((order) => {
@@ -160,16 +206,25 @@ const UserDashboardContent: React.FC = () => {
                 }
             });
             setLibraryItems(allItems);
-        } catch (error) { console.error("Enrichment error:", error); } 
-        finally { setLoadingOrders(false); }
+        } catch (error) {
+            console.error("Enrichment error:", error);
+        } finally {
+            setLoadingOrders(false);
+        }
     };
+
     enrichOrders();
   }, [rawOrders]);
 
+  // --- UPDATED: Handle Unfavorite via Subcollection ---
   const handleRemoveFavorite = async (productId: string) => {
     if (!user) return;
-    try { await deleteDoc(doc(db, "users", user.id, "favorites", productId)); } 
-    catch (error) { console.error("Error removing favorite:", error); }
+    try {
+        const favDocRef = doc(db, "users", user.id, "favorites", productId);
+        await deleteDoc(favDocRef);
+    } catch (error) {
+        console.error("Error removing favorite:", error);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -179,8 +234,11 @@ const UserDashboardContent: React.FC = () => {
     try {
       await updateDoc(doc(db, "users", user.id), { name: displayName });
       dispatch(updateProfile({ name: displayName }));
-    } catch (error) { console.error("Error updating profile:", error); } 
-    finally { setIsSaving(false); }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,8 +332,11 @@ const UserDashboardContent: React.FC = () => {
         await updateDoc(doc(db, "users", user.id), { avatar: dataUrl });
         setIsCropOpen(false);
         setCropImgSrc(null);
-      } catch (error) { console.error("Error saving image:", error); } 
-      finally { setIsSaving(false); }
+      } catch (error) {
+        console.error("Error saving image:", error);
+      } finally {
+        setIsSaving(false);
+      }
   };
 
   const handleDownloadItem = (item: LibraryItem) => {
@@ -304,178 +365,151 @@ const UserDashboardContent: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Completed': return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
-      case 'Processing': return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20';
-      case 'Failed': return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
-      default: return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700';
+      case 'Completed': return 'text-green-600 dark:text-green-500 bg-green-100 dark:bg-green-500/10 border-green-200 dark:border-green-500/20';
+      case 'Processing': return 'text-blue-600 dark:text-blue-500 bg-blue-100 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20';
+      case 'Failed': return 'text-red-600 dark:text-red-500 bg-red-100 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
+      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-zinc-700';
     }
   };
 
   if (authLoading) return <DashboardSkeleton />;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-white transition-colors duration-300 font-sans">
+    <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-300">
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-12">
-        {/* --- Premium Profile Header --- */}
+      <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
+        {/* --- Profile Header --- */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative mb-16 rounded-[2.5rem] overflow-hidden bg-white dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/80 shadow-2xl shadow-gray-200/50 dark:shadow-none"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          className="relative mb-12 rounded-3xl overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm"
         >
-          {/* Abstract Gradient Background */}
-          <div className="h-56 md:h-64 bg-gradient-to-br from-rose-600 via-rose-950 to-black relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-              {/* Decorative Glow */}
-              <div className="absolute top-0 right-1/4 w-96 h-96 bg-rose-500/30 rounded-full blur-[100px] -translate-y-1/2"></div>
+          <div className="h-48 bg-gradient-to-r from-rose-900 via-black to-black relative">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+              <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-t from-black/80 to-transparent"></div>
           </div>
           
-          <div className="px-6 pb-10 flex flex-col md:flex-row items-center md:items-end gap-6 relative z-10 -mt-24 md:-mt-20 md:pl-12">
+          <div className="px-6 pb-8 flex flex-col items-center -mt-20 gap-6 relative z-10">
               <div className="relative group">
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-[6px] border-white dark:border-zinc-900 overflow-hidden bg-zinc-800 shadow-xl relative z-10">
+                <div className="w-40 h-40 rounded-full border-4 border-white dark:border-zinc-900 overflow-hidden bg-zinc-800 shadow-2xl relative z-10">
                     <img 
                       src={user?.avatar || "https://ui-avatars.com/api/?name=User&background=random"} 
                       alt="Profile" 
                       className="w-full h-full object-cover"
                     />
                 </div>
+                
                 <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 bg-rose-600 text-white p-2.5 rounded-full border-[4px] border-white dark:border-zinc-900 z-20 hover:scale-105 transition-transform shadow-lg cursor-pointer"
+                    className="absolute bottom-2 right-2 bg-rose-600 text-white p-2.5 rounded-full border-4 border-white dark:border-zinc-900 z-20 hover:scale-110 transition-transform shadow-lg cursor-pointer"
                     title="Change Profile Picture"
                 >
-                    <Camera className="w-4 h-4 md:w-5 md:h-5" />
+                    <Camera className="w-5 h-5" />
                 </button>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
               </div>
               
-              <div className="text-center md:text-left space-y-1 flex-1 mb-4 md:mb-6">
-                <h1 className="text-3xl md:text-5xl font-black tracking-tight text-gray-900 dark:text-white">{user?.name || "Guest User"}</h1>
-                <p className="text-gray-500 dark:text-gray-400 font-medium">{user?.email}</p>
+              <div className="text-center space-y-1">
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{user?.name || "Guest User"}</h1>
+                <p className="text-gray-500 font-medium">{user?.email}</p>
               </div>
 
-              {/* Floating Stat Cards */}
-              <div className="flex gap-4 w-full md:w-auto mb-4 md:mb-6 md:pr-12">
-                <div className="flex-1 md:flex-none flex flex-col items-center justify-center px-8 py-4 bg-white/80 dark:bg-black/40 backdrop-blur-xl rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm">
+              <div className="flex gap-4 justify-center w-full max-w-lg mx-auto">
+                <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
                     <div className="font-black text-2xl text-gray-900 dark:text-white">{orders.length}</div>
-                    <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
                 </div>
-                <div className="flex-1 md:flex-none flex flex-col items-center justify-center px-8 py-4 bg-rose-50/80 dark:bg-rose-500/10 backdrop-blur-xl rounded-2xl border border-rose-100 dark:border-rose-500/20 shadow-sm">
-                    <div className="font-black text-2xl text-rose-600 dark:text-rose-400">Free</div>
-                    <div className="text-[10px] text-rose-600/60 dark:text-rose-400/60 uppercase tracking-widest font-bold mt-1">Plan</div>
+                <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
+                    <div className="font-black text-2xl text-rose-600">Free</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Plan</div>
                 </div>
               </div>
           </div>
         </motion.div>
 
-        {/* --- Main Content Area --- */}
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-          
-          {/* Sidebar Navigation */}
+        <div className="flex flex-col lg:flex-row gap-8">
           <div className="w-full lg:w-72 flex-shrink-0">
-            <nav className="space-y-1 sticky top-24 bg-white/50 dark:bg-zinc-900/30 p-2 rounded-3xl border border-gray-100 dark:border-zinc-800/50 backdrop-blur-md">
-              {tabs.map(item => {
-                const isActive = activeTab === item.label;
-                return (
-                  <button 
-                    key={item.id} 
-                    onClick={() => setActiveTab(item.label)}
-                    className={`relative w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all duration-300 text-left font-bold overflow-hidden group ${
-                      isActive 
-                      ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10' 
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div layoutId="activeTabIndicator" className="absolute left-0 top-0 bottom-0 w-1 bg-rose-600 rounded-r-full" />
-                    )}
-                    <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-rose-600 dark:text-rose-400' : 'text-gray-400 dark:text-zinc-600 group-hover:text-gray-900 dark:group-hover:text-white'}`} /> 
-                    <span className="flex-1">{item.label}</span>
-                    {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
-                  </button>
-                )
-              })}
+            <nav className="space-y-2 sticky top-24">
+              {tabs.map(item => (
+                <button 
+                  key={item.id} 
+                  onClick={() => setActiveTab(item.label)}
+                  className={`w-full flex items-center gap-3 px-5 py-4 rounded-xl transition-all text-left font-bold ${
+                    activeTab === item.label 
+                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20 scale-[1.02]' 
+                    : 'bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 border border-transparent hover:border-gray-200 dark:hover:border-zinc-700 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <item.icon className={`w-5 h-5 ${activeTab === item.label ? 'text-white' : 'text-gray-400 dark:text-zinc-600'}`} /> 
+                  {item.label}
+                </button>
+              ))}
             </nav>
           </div>
 
-          {/* Tab Content */}
           <div className="flex-1 min-h-[500px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
+                className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 shadow-sm"
               >
-                <div className="flex items-center gap-3 mb-8 px-2">
-                   <div className="p-2.5 bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl">
-                      {tabs.find(t => t.label === activeTab)?.icon && React.createElement(tabs.find(t => t.label === activeTab)!.icon, { className: "w-6 h-6" })}
-                   </div>
-                   <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">
-                     {activeTab}
-                   </h2>
-                </div>
+                <h2 className="text-2xl font-black mb-8 flex items-center gap-3 text-gray-900 dark:text-white">
+                  {tabs.find(t => t.label === activeTab)?.icon && React.createElement(tabs.find(t => t.label === activeTab)!.icon, { className: "w-7 h-7 text-rose-600" })}
+                  {activeTab}
+                </h2>
                 
                 {activeTab === 'My Library' && (
                   <div>
                       {loadingOrders ? (
-                          <div className="flex justify-center py-32"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                          <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
                       ) : libraryItems.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {libraryItems.map((item, idx) => (
-                                  <div key={`${item.id}-${idx}`} className={`group p-4 rounded-3xl bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800/80 shadow-sm hover:shadow-xl hover:shadow-gray-200/40 dark:hover:shadow-black/40 transition-all duration-300 flex gap-5 items-center ${item.isDeleted ? 'opacity-50 grayscale' : 'hover:border-rose-200 dark:hover:border-rose-900/50'}`}>
-                                      <div className="w-24 h-24 bg-gray-50 dark:bg-zinc-800 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center relative">
-                                          {item.isDeleted ? <Box className="w-8 h-8 text-gray-300" /> : <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />}
-                                          {!item.isDeleted && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
+                                  <div key={`${item.id}-${idx}`} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60 grayscale' : 'hover:border-rose-500/50'}`}>
+                                      <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
+                                          {item.isDeleted ? <Box className="w-8 h-8 text-gray-400" /> : <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
                                       </div>
-                                      <div className="flex-1 min-w-0 pr-2">
-                                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">{item.category}</p>
-                                          <h3 className="font-bold text-lg leading-tight truncate text-gray-900 dark:text-white mb-3">{item.name}</h3>
-                                          {!item.isDeleted && (
-                                            <button onClick={() => handleDownloadItem(item)} className="px-4 py-2 bg-gray-50 dark:bg-zinc-800 text-gray-900 dark:text-white text-xs font-bold rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 transition-colors flex items-center gap-2 w-fit">
-                                              <Download className="w-3.5 h-3.5" /> Download
-                                            </button>
-                                          )}
+                                      <div className="flex-1 min-w-0">
+                                          <h3 className="font-bold truncate text-gray-900 dark:text-white">{item.name}</h3>
+                                          <p className="text-xs text-gray-500 mb-2">{item.category}</p>
+                                          {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"><Download className="w-3 h-3" /> Download</button>}
                                       </div>
                                   </div>
                               ))}
                           </div>
-                      ) : <EmptyState icon={Box} title="Your library is empty" text="Purchased and free downloads will appear here." actionText="Browse Catalog" />}
+                      ) : <EmptyState icon={Box} text="Your library is empty" actionText="Browse Shop" />}
                   </div>
                 )}
 
                 {activeTab === 'History' && (
                     <div className="space-y-4">
                       {loadingOrders ? (
-                          <div className="flex justify-center py-32"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                          <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
                       ) : orders.length > 0 ? (
                           orders.map((order) => (
-                              <div key={order.id} className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800/80 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                  <div className="flex items-center gap-5">
-                                      <div className={`p-4 rounded-2xl ${order.status === 'Completed' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-gray-50 dark:bg-zinc-800 text-gray-500'}`}>
-                                        <Package className="w-6 h-6" />
-                                      </div>
+                              <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                  <div className="flex items-center gap-4">
+                                      <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
                                       <div>
-                                          <div className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-1">Order ID</div>
-                                          <div className="font-bold text-lg text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
-                                          <div className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                                            <span>{new Date(order.createdAt).toLocaleDateString()}</span>
-                                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-700" />
-                                            <span>{order.items?.length || 0} Items</span>
-                                          </div>
+                                          <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
+                                          <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
                                       </div>
                                   </div>
-                                  <div className="flex flex-row-reverse md:flex-col items-center md:items-end gap-3 w-full md:w-auto justify-between">
-                                      <span className={`px-4 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
+                                  <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+                                      <div className="font-bold text-lg font-mono text-rose-600">₦{(order.total || 0).toFixed(2)}</div>
+                                      <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
                                           {order.status === 'Completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                                           {order.status || 'Pending'}
                                       </span>
-                                      <div className="font-black text-xl text-gray-900 dark:text-white">₦{(order.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                   </div>
                               </div>
                           ))
-                      ) : <EmptyState icon={Clock} title="No order history" text="You haven't made any purchases yet." actionText="Start Shopping" />}
+                      ) : <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />}
                     </div>
                 )}
 
@@ -484,102 +518,80 @@ const UserDashboardContent: React.FC = () => {
                     {libraryItems.length > 0 ? (
                         <div className="space-y-3">
                             {libraryItems.map((item, idx) => (
-                                <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800/80 hover:border-gray-200 dark:hover:border-zinc-700 transition-colors flex items-center justify-between group">
+                                <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-gray-50 dark:bg-zinc-800 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
-                                            {item.isDeleted ? <Box className="w-5 h-5 text-gray-300" /> : <img src={item.image} className="w-full h-full object-cover" />}
+                                        <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                                            {item.isDeleted ? <Box className="w-4 h-4 text-gray-400" /> : <img src={item.image} className="w-full h-full object-cover" />}
                                         </div>
-                                        <div>
-                                          <h3 className="font-bold text-gray-900 dark:text-white">{item.name}</h3>
-                                          <p className="text-xs text-gray-400 mt-0.5">{item.category}</p>
-                                        </div>
+                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">{item.name}</h3>
                                     </div>
-                                    {!item.isDeleted && (
-                                      <button onClick={() => handleDownloadItem(item)} className="p-3 bg-gray-50 dark:bg-zinc-800 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 transition-all shadow-sm">
-                                        <Download className="w-4 h-4" />
-                                      </button>
-                                    )}
+                                    {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="p-2 bg-white dark:bg-black rounded-lg border text-gray-500 hover:text-rose-600 transition-all"><Download className="w-4 h-4" /></button>}
                                 </div>
                             ))}
                         </div>
-                    ) : <EmptyState icon={Download} title="No downloads available" text="Items you unlock will appear here for direct download." actionText="Browse Catalog" />}
+                    ) : <EmptyState icon={Download} text="No downloads available" actionText="Browse Shop" />}
                   </div>
                 )}
 
+                {/* --- UPDATED FAVORITES TAB --- */}
                 {activeTab === 'Favorites' && (
                     <div>
                         {loadingFavorites ? (
-                            <div className="flex justify-center py-32"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                            <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
                         ) : favoriteItems.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {favoriteItems.map((item) => (
-                                    <div key={item.id} className={`group p-4 rounded-3xl bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800/80 shadow-sm transition-all flex flex-col gap-4 ${item.isDeleted ? 'opacity-50' : 'hover:shadow-xl hover:shadow-rose-500/5 hover:border-rose-100 dark:hover:border-rose-900/30'}`}>
-                                        <div className="w-full aspect-video bg-gray-50 dark:bg-zinc-800 rounded-2xl overflow-hidden relative">
-                                            {!item.isDeleted ? (
-                                              <>
-                                                <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                              </>
-                                            ) : (
-                                              <div className="w-full h-full flex items-center justify-center"><Box className="w-8 h-8 text-gray-300" /></div>
-                                            )}
+                                    <div key={item.id} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60' : 'hover:border-rose-500/50'}`}>
+                                        <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
+                                            {!item.isDeleted && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
                                         </div>
-                                        <div className="flex-1 min-w-0 px-1">
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">{item.category}</p>
-                                            <h3 className={`font-bold text-lg truncate mb-4 ${item.isDeleted ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>{item.name}</h3>
-                                            <div className="flex items-center justify-between mt-auto">
-                                                {!item.isDeleted && (
-                                                  <Link href={`/product/${item.id}`} className="text-sm font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 transition-colors">
-                                                    View Details
-                                                  </Link>
-                                                )}
-                                                <button onClick={() => handleRemoveFavorite(item.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-colors ml-auto">
-                                                  <HeartOff className="w-4 h-4" />
-                                                </button>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className={`font-bold truncate ${item.isDeleted ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>{item.name}</h3>
+                                            <p className="text-xs text-gray-500 mb-3">{item.category}</p>
+                                            <div className="flex gap-4">
+                                                {!item.isDeleted && <Link href={`/product/${item.id}`} className="text-xs font-bold text-rose-600 hover:underline">View Item</Link>}
+                                                <button onClick={() => handleRemoveFavorite(item.id)} className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"><HeartOff className="w-3 h-3" /> Remove</button>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        ) : <EmptyState icon={Heart} title="No favorites yet" text="Save items you like by clicking the heart icon on products." actionText="Explore Products" />}
+                        ) : <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
                     </div>
                 )}
 
                 {activeTab === 'Settings' && (
-                    <div className="max-w-2xl">
-                      <div className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 shadow-sm">
-                        <form onSubmit={handleSaveProfile} className="space-y-6">
-                            <div className="grid grid-cols-1 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Display Name</label>
-                                    <div className="relative group">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-rose-500 transition-colors" />
-                                        <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-black/50 border border-transparent dark:border-zinc-800 focus:border-rose-500 focus:bg-white dark:focus:bg-black outline-none transition-all font-semibold text-gray-900 dark:text-white shadow-inner shadow-gray-100/50 dark:shadow-none" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Email Address</label>
-                                    <div className="relative">
-                                        <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 opacity-50" />
-                                        <input type="email" readOnly defaultValue={user?.email} className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-100 dark:bg-zinc-800/50 border border-transparent text-gray-400 cursor-not-allowed font-semibold" />
-                                    </div>
-                                    <p className="text-xs text-gray-400 ml-1 mt-1">Email cannot be changed directly for security reasons.</p>
-                                </div>
-                            </div>
-                            <button disabled={isSaving} type="submit" className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:bg-rose-600 dark:hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-gray-200 dark:shadow-none flex items-center gap-2 disabled:opacity-70 w-full md:w-auto mt-4">
-                                {isSaving ? <Loader className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5" />} Save Changes
-                            </button>
-                        </form>
-                      </div>
-
-                      <div className="mt-8 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                          <div>
-                              <h4 className="font-black text-red-600 dark:text-red-400 text-lg">Danger Zone</h4>
-                              <p className="text-sm text-red-600/70 dark:text-red-400/70 mt-1 font-medium">Permanently remove your account and all associated data.</p>
+                    <div className="max-w-2xl space-y-8">
+                      <form onSubmit={handleSaveProfile} className="space-y-6">
+                          <div className="grid grid-cols-1 gap-6">
+                              <div className="space-y-2">
+                                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Display Name</label>
+                                  <div className="relative">
+                                      <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                      <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800/50 border outline-none focus:border-rose-500 transition-all font-medium" />
+                                  </div>
+                              </div>
+                              <div className="space-y-2">
+                                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Email Address</label>
+                                  <div className="relative">
+                                      <Shield className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                      <input type="email" readOnly defaultValue={user?.email} className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 dark:bg-zinc-900 border text-gray-500 cursor-not-allowed font-medium" />
+                                  </div>
+                              </div>
                           </div>
-                          <button className="px-6 py-3 bg-white dark:bg-black text-red-600 dark:text-red-500 font-bold rounded-xl border border-red-100 dark:border-red-900/50 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white transition-colors text-sm flex items-center gap-2 shrink-0">
-                            <Trash2 className="w-4 h-4" /> Delete Account
+                          <button disabled={isSaving} type="submit" className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all shadow-lg flex items-center gap-2 disabled:opacity-70">
+                              {isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Save Changes
                           </button>
+                      </form>
+                      <div className="pt-8 border-t border-gray-100 dark:border-zinc-800">
+                          <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Danger Zone</h3>
+                          <div className="p-6 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-2xl flex items-center justify-between">
+                              <div>
+                                  <h4 className="font-bold text-red-600 dark:text-red-500">Delete Account</h4>
+                                  <p className="text-sm text-red-600/70 dark:text-red-400/70 mt-1">Permanently remove your data and access.</p>
+                              </div>
+                              <button className="px-5 py-2.5 bg-white dark:bg-black text-red-600 font-bold rounded-xl border hover:bg-red-50 transition-colors text-sm flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete</button>
+                          </div>
                       </div>
                     </div>
                 )}
@@ -589,29 +601,28 @@ const UserDashboardContent: React.FC = () => {
         </div>
       </div>
 
-      {/* Crop Modal */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-2xl p-6 md:p-8 w-full max-w-md border border-gray-100 dark:border-zinc-800">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-6 w-full max-w-md border">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-black flex items-center gap-2 text-gray-900 dark:text-white"><Upload className="w-5 h-5 text-rose-600" /> Adjust Image</h3>
-                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="p-2 bg-gray-50 dark:bg-zinc-800 text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-full transition-colors"><X className="w-5 h-5" /></button>
+                        <h3 className="text-xl font-bold flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600" /> Adjust Image</h3>
+                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full"><X className="w-5 h-5" /></button>
                     </div>
-                    <div className="relative w-full flex justify-center mb-8 overflow-hidden bg-gray-50 dark:bg-black/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-800 p-4">
-                        <div className="relative overflow-hidden rounded-full shadow-[0_0_0_100px_rgba(255,255,255,0.8)] dark:shadow-[0_0_0_100px_rgba(0,0,0,0.8)] cursor-move touch-none ring-4 ring-rose-500/20" style={{ width: CROP_SIZE, height: CROP_SIZE }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleMouseDown} onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}>
+                    <div className="relative w-full flex justify-center mb-6 overflow-hidden bg-gray-100 dark:bg-black rounded-2xl border-2 border-dashed">
+                        <div className="relative overflow-hidden rounded-full shadow-[0_0_0_100px_rgba(255,255,255,0.9)] dark:shadow-[0_0_0_100px_rgba(0,0,0,0.8)] cursor-move touch-none" style={{ width: CROP_SIZE, height: CROP_SIZE }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleMouseDown} onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}>
                             <img ref={cropImgRef} src={cropImgSrc} onLoad={handleImageLoad} alt="Crop Preview" draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`, transition: isDragging ? 'none' : 'transform 0.1s ease-out' }} />
                         </div>
                     </div>
                     <div className="space-y-6">
-                        <div className="flex items-center gap-4 px-2 bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-2xl">
-                            <ZoomOut className="w-4 h-4 text-gray-500" />
-                            <input type="range" min="1" max="3" step="0.1" value={cropZoom} onChange={(e) => setCropZoom(parseFloat(e.target.value))} className="flex-1 accent-rose-600 h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer" />
-                            <ZoomIn className="w-4 h-4 text-gray-500" />
+                        <div className="flex items-center gap-4 px-2">
+                            <ZoomOut className="w-4 h-4 text-gray-400" />
+                            <input type="range" min="1" max="3" step="0.1" value={cropZoom} onChange={(e) => setCropZoom(parseFloat(e.target.value))} className="flex-1 accent-rose-600 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                            <ZoomIn className="w-4 h-4 text-gray-400" />
                         </div>
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="flex-1 py-4 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-2xl font-bold text-gray-600 dark:text-gray-300 transition-colors">Cancel</button>
-                            <button onClick={handleSaveCrop} disabled={isSaving} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 disabled:opacity-70">{isSaving ? <Loader className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5" />} Save Image</button>
+                        <div className="flex gap-3">
+                            <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="flex-1 py-3 border rounded-xl font-bold text-gray-600">Cancel</button>
+                            <button onClick={handleSaveCrop} disabled={isSaving} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 shadow-lg">{isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Save</button>
                         </div>
                     </div>
                 </motion.div>
@@ -622,19 +633,12 @@ const UserDashboardContent: React.FC = () => {
   );
 };
 
-interface EmptyStateProps { icon: LucideIcon; title: string; text: string; actionText?: string; }
-const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, title, text, actionText }) => (
-    <div className="text-center py-20 px-4 bg-gray-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-gray-200 dark:border-zinc-800">
-        <div className="w-20 h-20 bg-white dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 dark:border-zinc-700">
-          <Icon className="w-8 h-8 text-gray-400 dark:text-zinc-500" />
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{title}</h3>
-        <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 max-w-sm mx-auto">{text}</p>
-        {actionText && (
-          <Link href="/shop" className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black font-bold rounded-xl hover:bg-rose-600 dark:hover:bg-rose-500 transition-colors shadow-md">
-            {actionText} <ChevronRight className="w-4 h-4" />
-          </Link>
-        )}
+interface EmptyStateProps { icon: LucideIcon; text: string; actionText?: string; }
+const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, text, actionText }) => (
+    <div className="text-center py-20 bg-gray-50 dark:bg-zinc-800/20 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-800">
+        <div className="w-16 h-16 bg-gray-200 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4"><Icon className="w-8 h-8 text-gray-400 dark:text-zinc-600" /></div>
+        <p className="text-gray-500 font-medium mb-4">{text}</p>
+        {actionText && <Link href="/shop" className="text-rose-600 font-bold hover:underline">{actionText}</Link>}
     </div>
 );
 
