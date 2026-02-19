@@ -7,7 +7,7 @@ import { Upload as UploadIcon, X, FileAudio, Image as ImageIcon, Check, Loader, 
 import { ProductCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import DescriptionEditor from './DescriptionEditor'; 
-import { collection, addDoc,doc } from 'firebase/firestore';
+import { collection, addDoc,doc,setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 import { v4 as uuidv4 } from 'uuid';
