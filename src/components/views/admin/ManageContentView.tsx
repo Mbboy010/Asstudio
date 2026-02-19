@@ -1,23 +1,23 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, Edit2, Trash2, Search, MessageSquare, 
   Download, ShoppingCart, HardDrive, Calendar,
-  MoreVertical, ExternalLink, Loader, X, Save,
-  Image as ImageIcon, Upload, Star, User
+  Loader
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { collection, getDocs, query, orderBy, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+// Removed unused imports: motion, AnimatePresence, getDocs, useRef, etc.
+import { collection, query, orderBy, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { ProductCategory, Product } from '@/types';
+import { Product } from '@/types'; // Kept Product, removed ProductCategory as it was unused
 
 // --- Sub-Components ---
 import ReviewModal from './ReviewModal';
 
 const AdminManageView: React.FC = () => {
-  const [products, setProducts] = useState<any[]>([]);
+  // Fixed: Replaced 'any[]' with 'Product[]'
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -29,9 +29,11 @@ const AdminManageView: React.FC = () => {
     setLoading(true);
     const q = query(collection(db, "products"), orderBy("uploadDate", "desc"));
     
-    // Using onSnapshot for real-time dashboard updates
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const docs = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as Product)); // Cast to Product type
       setProducts(docs);
       setLoading(false);
     });
@@ -46,7 +48,7 @@ const AdminManageView: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Permanent delete? This cannot be undone.")) {
-      await deleteDoc(doc(db, "products", id));
+      await deleteDoc(doc(db, id.startsWith('products/') ? id : `products/${id}`));
     }
   };
 
@@ -69,7 +71,7 @@ const AdminManageView: React.FC = () => {
             <input 
               type="text" 
               placeholder="Search assets..."
-              className="pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition-all w-64"
+              className="pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition-all w-64 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -102,7 +104,8 @@ const AdminManageView: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex-shrink-0">
-                        <img src={product.image} alt="" className="w-full h-full object-cover" />
+                        {/* Added alt prop */}
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <div className="font-bold dark:text-white text-sm line-clamp-1">{product.name}</div>
@@ -149,7 +152,6 @@ const AdminManageView: React.FC = () => {
                         className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 transition-colors rounded-lg relative"
                       >
                         <MessageSquare className="w-4 h-4" />
-                        {/* You can add a badge here for review count if you have it in state */}
                       </button>
                       <button className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600 transition-colors rounded-lg">
                         <Edit2 className="w-4 h-4" />
@@ -169,7 +171,6 @@ const AdminManageView: React.FC = () => {
         </div>
       </div>
 
-      {/* Review Modal Logic */}
       <ReviewModal 
         isOpen={isReviewOpen} 
         onClose={() => setIsReviewOpen(false)} 
