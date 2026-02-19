@@ -7,21 +7,17 @@ import {
   Download, ShoppingCart, HardDrive, Calendar,
   Loader
 } from 'lucide-react';
-// Removed unused imports: motion, AnimatePresence, getDocs, useRef, etc.
 import { collection, query, orderBy, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { Product } from '@/types'; // Kept Product, removed ProductCategory as it was unused
+import { Product } from '@/types'; 
 
-// --- Sub-Components ---
 import ReviewModal from './ReviewModal';
 
 const AdminManageView: React.FC = () => {
-  // Fixed: Replaced 'any[]' with 'Product[]'
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Modals State
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
@@ -33,7 +29,7 @@ const AdminManageView: React.FC = () => {
       const docs = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
-      } as Product)); // Cast to Product type
+      } as Product));
       setProducts(docs);
       setLoading(false);
     });
@@ -58,7 +54,6 @@ const AdminManageView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#050505] p-4 md:p-8">
-      {/* Header Section */}
       <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight dark:text-white">AS-STUDIO INVENTORY</h1>
@@ -82,7 +77,6 @@ const AdminManageView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Table */}
       <div className="max-w-7xl mx-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -104,8 +98,12 @@ const AdminManageView: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex-shrink-0">
-                        {/* Added alt prop */}
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        {/* FIX APPLIED HERE: Added null check for src */}
+                        <img 
+                          src={product.image ?? ''} 
+                          alt={product.name ?? 'Product Image'} 
+                          className="w-full h-full object-cover" 
+                        />
                       </div>
                       <div>
                         <div className="font-bold dark:text-white text-sm line-clamp-1">{product.name}</div>
@@ -149,7 +147,7 @@ const AdminManageView: React.FC = () => {
                     <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => { setSelectedProductId(product.id); setIsReviewOpen(true); }}
-                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 transition-colors rounded-lg relative"
+                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 transition-colors rounded-lg"
                       >
                         <MessageSquare className="w-4 h-4" />
                       </button>
