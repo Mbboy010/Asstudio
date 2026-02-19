@@ -165,7 +165,7 @@ const UserDashboardContent: React.FC = () => {
             const productIds = new Set<string>();
             rawOrders.forEach(order => order.items?.forEach(item => productIds.add(item.id)));
 
-            const productsData: Record<string, any> = {};
+            const productsData: Record<string, {   name?: string;   image?: string;   category?: string;   demoUrl?: string;   productUrl?: string; } | null> = {};
             await Promise.all(
                 Array.from(productIds).map(async (id) => {
                     const productSnap = await getDoc(doc(db, 'products', id));
