@@ -13,8 +13,14 @@ import { Product } from '@/types';
 
 import ReviewModal from './ReviewModal';
 
+// Local extension to prevent TypeScript errors if the main Product type is missing these
+interface AdminProduct extends Product {
+  downloads?: number;
+  cartAdds?: number;
+}
+
 const AdminManageView: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -29,7 +35,7 @@ const AdminManageView: React.FC = () => {
       const docs = snapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
-      } as Product));
+      } as AdminProduct));
       setProducts(docs);
       setLoading(false);
     });
@@ -44,7 +50,11 @@ const AdminManageView: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Permanent delete? This cannot be undone.")) {
-      await deleteDoc(doc(db, id.startsWith('products/') ? id : `products/${id}`));
+      try {
+        await deleteDoc(doc(db, id.startsWith('products/') ? id : `products/${id}`));
+      } catch (err) {
+        console.error("Delete failed:", err);
+      }
     }
   };
 
@@ -98,10 +108,9 @@ const AdminManageView: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex-shrink-0">
-                        {/* FIX APPLIED HERE: Added null check for src */}
                         <img 
                           src={product.image ?? ''} 
-                          alt={product.name ?? 'Product Image'} 
+                          alt={product.name || 'Asset Image'} 
                           className="w-full h-full object-cover" 
                         />
                       </div>
