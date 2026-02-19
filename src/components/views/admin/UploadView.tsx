@@ -289,7 +289,7 @@ const AdminUploadView: React.FC = () => {
           }
                 
       const finalCoverUrl = coverPreview;
-      const dataId = `${replaceWhiteWithDash{formData.name}}-${iduu}`
+      const dataId = `${replaceWhiteWithDash(formData.name)}-${iduu}`;
       
       await setDoc(doc(collection(db, "products"), dataId), {
         name: formData.name,
