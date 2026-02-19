@@ -9,9 +9,13 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
 export const metadata: Metadata = {
+  // 1. Tell Next.js your domain so it can find images in the /public folder
+  metadataBase: new URL('https://asstudio.com'), 
+  
   title: "Asstudio | Future of Sound",
   description: "A high-end, futuristic marketplace for music studio tools, offering sample packs, presets, and audio software with a cyber-aesthetic interface.",
   keywords: ["vst plugins", "sample packs", "presets", "audio software", "music production"],
+  
   openGraph: {
     title: "Asstudio | Future of Sound",
     description: "Premium audio tools for modern producers.",
@@ -19,13 +23,23 @@ export const metadata: Metadata = {
     siteName: "Asstudio",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=2070",
-        width: 1200,
-        height: 630,
+        // 2. Point to the image in your public folder
+        url: "/android-chrome-512x512.png", 
+        width: 512,
+        height: 512,
+        alt: "Asstudio Logo",
       },
     ],
     locale: "en_US",
     type: "website",
+  },
+  
+  // 3. Twitter/X requires its own object to display properly
+  twitter: {
+    card: "summary", // Use "summary" for square images like your 512x512 logo
+    title: "Asstudio | Future of Sound",
+    description: "Premium audio tools for modern producers.",
+    images: ["/android-chrome-512x512.png"],
   },
 };
 
@@ -39,7 +53,6 @@ export default function RootLayout({
       <body className={`${inter.variable} ${firaCode.variable} font-sans`}>
         <Providers>
             {/* We wrap the inner content with the existing Layout component for Navbar/Footer */}
-            {/* Note: You might need to refactor Layout.tsx to remove BrowserRouter if it exists inside it */}
             <MainLayout> 
               {children}
             </MainLayout>
