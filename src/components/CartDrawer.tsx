@@ -105,11 +105,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
       setIsCheckingOut(true);
 
+      // --- NEW: Map to just id and savedAt ---
+      const sortedItems = items.map(item => ({
+        id: item.id,
+        savedAt: new Date().toISOString()
+      }));
+
       // 1. Create Order
       await addDoc(collection(db, 'orders'), {
         userId: user.uid,
         email: user.email,
-        items,
+        items: sortedItems, // --- Use the simplified mapped array here ---
         total: subtotal,
         status: 'Completed',
         createdAt: new Date().toISOString()

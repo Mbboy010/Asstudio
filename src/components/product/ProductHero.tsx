@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { 
   Pause, Play, ShoppingCart, Share2, Check, 
@@ -7,6 +7,11 @@ import {
 } from 'lucide-react'; 
 import { ExtendedProduct } from './ProductDetailContent';
 import { StarRating } from './ProductInfo';
+
+// --- NEW FIREBASE IMPORTS ---
+import { doc, setDoc, deleteDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { db, auth } from '@/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 interface ProductHeroProps {
   product: ExtendedProduct;
@@ -35,6 +40,91 @@ export const ProductHero = ({
 
   // Calculate progress percentage for the slider background
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+
+  // --- NEW STATE FOR AUTH & FAVORITES ---
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // 1. Check Auth & Load Initial Favorite Status
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setUser(fbUser);
+      if (fbUser && product?.id) {
+        // Check if this product is in the user's favorites subcollection
+        const favRef = doc(db, 'users', fbUser.uid, 'favorites', product.id);
+        const favSnap = await getDoc(favRef);
+        if (favSnap.exists()) {
+          setIsFavorite(true);
+        }
+      } else {
+        setIsFavorite(false);
+      }
+    });
+    return () => unsub();
+  }, [product?.id]);
+
+  // --- NEW ACTIONS ---
+
+  // Handle Favorite Toggle
+  const toggleFavorite = async () => {
+    if (!user) {
+      alert("Please log in to save this to your favorites.");
+      return;
+    }
+    if (!product?.id) return;
+
+    const favRef = doc(db, 'users', user.uid, 'favorites', product.id);
+    
+    try {
+      if (isFavorite) {
+        setIsFavorite(false);
+        await deleteDoc(favRef); // Remove from favorites
+      } else {
+        setIsFavorite(true);
+        await setDoc(favRef, {
+          userId: user.uid,
+          productId: product.id,
+          savedAt: new Date().toISOString()
+        }); // Save to favorites
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      // Revert UI state if database fails
+      setIsFavorite(!isFavorite); 
+    }
+  };
+
+  // Wrapper for Download to increment count
+  const onDownloadClick = async (isDemo: boolean) => {
+    handleDownload(isDemo); // Run your original prop function
+    
+    if (product?.id) {
+      try {
+        const productRef = doc(db, 'products', product.id);
+        await updateDoc(productRef, { 
+          downloads: increment(1) 
+        });
+      } catch (error) {
+        console.error("Failed to increment download count:", error);
+      }
+    }
+  };
+
+  // Wrapper for Add to Cart to increment count
+  const onAddToCartClick = async (prod: ExtendedProduct) => {
+    handleAddToCart(prod); // Run your original prop function
+
+    if (product?.id) {
+      try {
+        const productRef = doc(db, 'products', product.id);
+        await updateDoc(productRef, { 
+          cartAdds: increment(1) 
+        });
+      } catch (error) {
+        console.error("Failed to increment cart count:", error);
+      }
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 mb-32 items-center">
@@ -226,7 +316,7 @@ export const ProductHero = ({
               /* --- FREE DOWNLOAD STATE --- */
               <div className="space-y-4">
                 <button 
-                  onClick={() => handleDownload(false)} 
+                  onClick={() => onDownloadClick(false)} // UPDATED HERE
                   disabled={isDownloading} 
                   className="group relative w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-lg rounded-2xl flex items-center justify-center gap-3 overflow-hidden transition-all hover:shadow-2xl hover:shadow-gray-900/20 dark:hover:shadow-white/20 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
                 >
@@ -242,7 +332,7 @@ export const ProductHero = ({
               /* --- PAID STATE --- */
               <div className="flex flex-col sm:flex-row gap-4">
                 <button 
-                  onClick={() => handleAddToCart(product)} 
+                  onClick={() => onAddToCartClick(product)} // UPDATED HERE
                   className="flex-[2] py-5 bg-rose-600 text-white font-bold text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-rose-700 hover:shadow-xl hover:shadow-rose-600/30 transition-all active:scale-[0.98]"
                 >
                   <ShoppingCart className="w-5 h-5" /> 
@@ -250,15 +340,19 @@ export const ProductHero = ({
                 </button>
                 {product.demoUrl && (
                   <button 
-                    onClick={() => handleDownload(true)} 
+                    onClick={() => onDownloadClick(true)} // UPDATED HERE
                     className="flex-1 py-5 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white border border-gray-200 dark:border-zinc-700 font-bold text-lg rounded-2xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Download className="w-5 h-5 opacity-50" />
                     Demo
                   </button>
                 )}
-                <button className="p-5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all">
-                  <Heart className="w-6 h-6" />
+                {/* --- UPDATED FAVORITE BUTTON --- */}
+                <button 
+                  onClick={toggleFavorite}
+                  className="p-5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                >
+                  <Heart className={`w-6 h-6 transition-colors ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
                 </button>
               </div>
             )}

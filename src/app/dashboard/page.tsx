@@ -7,11 +7,12 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2, LucideIcon // Added LucideIcon type
+  User, Shield, Trash2, LucideIcon, HeartOff 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
-import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+// UPDATED: Replaced arrayRemove with deleteDoc for subcollection removal
+import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 const CROP_SIZE = 280;
@@ -21,12 +22,12 @@ interface LibraryItem {
     name: string;
     image: string;
     category: string;
-    size: string;
-    orderDate: string;
+    size?: string;
+    orderDate?: string;
     productUrl?: string;
+    isDeleted?: boolean; 
 }
 
-// Fixed the "any" type here
 interface OrderItem {
     id: string;
     createdAt: string;
@@ -35,18 +36,32 @@ interface OrderItem {
     items: LibraryItem[]; 
 }
 
+interface RawOrderItem {
+    id: string;
+    createdAt: string;
+    status: string;
+    total: number;
+    items: { id: string; savedAt: string }[];
+}
+
 const UserDashboardContent: React.FC = () => {
   const dispatch = useDispatch();
   const { user, loading: authLoading } = useSelector((state: RootState) => state.auth);
   const [activeTab, setActiveTab] = useState('My Library');
   const [isSaving, setIsSaving] = useState(false);
   
+  const [rawOrders, setRawOrders] = useState<RawOrderItem[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
   
+  // Favorites States
+  const [favoriteItems, setFavoriteItems] = useState<LibraryItem[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+  
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [displayName, setDisplayName] = useState(user?.name || '');
 
+  // Crop State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [cropImgSrc, setCropImgSrc] = useState<string | null>(null);
@@ -62,6 +77,53 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
+  // --- 1. UPDATED: Fetch Favorites from Subcollection Real-time ---
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoadingFavorites(true);
+
+    const favColRef = collection(db, "users", user.id, "favorites");
+    
+    const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
+        // Map document IDs from the subcollection
+        const favoriteIds = snapshot.docs.map(doc => doc.id);
+
+        if (favoriteIds.length === 0) {
+            setFavoriteItems([]);
+            setLoadingFavorites(false);
+            return;
+        }
+
+        try {
+            // Resolve all IDs to full product objects
+            const favDetails = await Promise.all(
+                favoriteIds.map(async (prodId: string) => {
+                    const productSnap = await getDoc(doc(db, 'products', prodId));
+                    if (productSnap.exists()) {
+                        const pData = productSnap.data();
+                        return {
+                            id: prodId,
+                            name: pData.name || 'Unknown Product',
+                            image: pData.image || '',
+                            category: pData.category || 'Uncategorized',
+                            isDeleted: false
+                        };
+                    }
+                    return { id: prodId, name: 'Item Unavailable', image: '', category: 'N/A', isDeleted: true };
+                })
+            );
+            setFavoriteItems(favDetails);
+        } catch (err) {
+            console.error("Error fetching favorites:", err);
+        } finally {
+            setLoadingFavorites(false);
+        }
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // --- 2. Fetch Raw Orders Snapshot ---
   useEffect(() => {
     if (!user) return;
     setLoadingOrders(true);
@@ -79,59 +141,105 @@ const UserDashboardContent: React.FC = () => {
                     total: data.total,
                     items: data.items || [] 
                 };
-            }) as OrderItem[]; // Cast to OrderItem
+            }) as RawOrderItem[];
             
-            fetchedOrders.sort((a, b) => {
-                const dateA = new Date(a.createdAt || 0).getTime();
-                const dateB = new Date(b.createdAt || 0).getTime();
-                return dateB - dateA;
-            });
-            
-            setOrders(fetchedOrders);
-            
-            const allItems: LibraryItem[] = [];
-            const seenIds = new Set();
-            
-            fetchedOrders.forEach((order) => {
-                if (order.status === 'Completed' && Array.isArray(order.items)) {
-                    order.items.forEach((item: LibraryItem) => { // Specified type
-                        const itemId = item.id || `item-${Math.random()}`; 
-                        if (!seenIds.has(itemId)) {
-                            seenIds.add(itemId);
-                            allItems.push({
-                                id: item.id,
-                                name: item.name,
-                                image: item.image,
-                                category: item.category,
-                                size: item.size,
-                                orderDate: order.createdAt,
-                                productUrl: item.productUrl
-                            });
-                        }
-                    });
-                }
-            });
-            setLibraryItems(allItems);
+            fetchedOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            setRawOrders(fetchedOrders);
+            if (fetchedOrders.length === 0) setLoadingOrders(false);
         } catch (err) {
-            console.error("Error processing orders snapshot:", err);
-        } finally {
             setLoadingOrders(false);
         }
     }, (error) => {
-        console.error("Error fetching orders:", error);
         setLoadingOrders(false);
     });
 
     return () => unsubscribe();
   }, [user]);
 
-  const tabs = [
-    { id: 'library', label: 'My Library', icon: Box },
-    { id: 'history', label: 'History', icon: Clock },
-    { id: 'downloads', label: 'Downloads', icon: Download },
-    { id: 'favorites', label: 'Favorites', icon: Heart },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  // --- 3. Enrich Orders with Live Product Data ---
+  useEffect(() => {
+    const enrichOrders = async () => {
+        if (rawOrders.length === 0) return;
+        
+        try {
+            const productIds = new Set<string>();
+            rawOrders.forEach(order => order.items?.forEach(item => productIds.add(item.id)));
+
+            const productsData: Record<string, any> = {};
+            await Promise.all(
+                Array.from(productIds).map(async (id) => {
+                    const productSnap = await getDoc(doc(db, 'products', id));
+                    productsData[id] = productSnap.exists() ? productSnap.data() : null;
+                })
+            );
+
+            const enrichedOrders: OrderItem[] = rawOrders.map(order => ({
+                ...order,
+                items: (order.items || []).map(item => {
+                    const productInfo = productsData[item.id];
+                    if (!productInfo) return { id: item.id, name: 'Data is deleted', image: '', category: 'Unavailable', orderDate: item.savedAt || order.createdAt, isDeleted: true };
+
+                    return {
+                        id: item.id,
+                        name: productInfo.name || 'Unknown',
+                        image: productInfo.image || '',
+                        category: productInfo.category || 'N/A',
+                        productUrl: productInfo.demoUrl || productInfo.productUrl,
+                        orderDate: item.savedAt || order.createdAt,
+                        isDeleted: false
+                    };
+                })
+            }));
+
+            setOrders(enrichedOrders);
+
+            const allItems: LibraryItem[] = [];
+            const seenIds = new Set();
+            enrichedOrders.forEach((order) => {
+                if (order.status === 'Completed') {
+                    order.items.forEach((item) => {
+                        if (!seenIds.has(item.id)) {
+                            seenIds.add(item.id);
+                            allItems.push(item);
+                        }
+                    });
+                }
+            });
+            setLibraryItems(allItems);
+        } catch (error) {
+            console.error("Enrichment error:", error);
+        } finally {
+            setLoadingOrders(false);
+        }
+    };
+
+    enrichOrders();
+  }, [rawOrders]);
+
+  // --- UPDATED: Handle Unfavorite via Subcollection ---
+  const handleRemoveFavorite = async (productId: string) => {
+    if (!user) return;
+    try {
+        const favDocRef = doc(db, "users", user.id, "favorites", productId);
+        await deleteDoc(favDocRef);
+    } catch (error) {
+        console.error("Error removing favorite:", error);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "users", user.id), { name: displayName });
+      dispatch(updateProfile({ name: displayName }));
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -231,42 +339,37 @@ const UserDashboardContent: React.FC = () => {
       }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!user) return;
-      setIsSaving(true);
-      try {
-        await updateDoc(doc(db, "users", user.id), { name: displayName });
-        dispatch(updateProfile({ name: displayName }));
-      } catch (error) {
-        console.error("Error updating profile:", error);
-      } finally {
-        setIsSaving(false);
-      }
+  const handleDownloadItem = (item: LibraryItem) => {
+    if (item.isDeleted) return;
+    if (item.productUrl) {
+        window.open(item.productUrl, '_blank');
+    } else {
+        const element = document.createElement("a");
+        const fileContent = `Product: ${item.name}\nDownload ID: ${item.id}`;
+        const file = new Blob([fileContent], {type: 'text/plain'});
+        element.href = URL.createObjectURL(file);
+        element.download = `${(item.name || 'product').replace(/\s+/g, '_')}_License.txt`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
   };
 
-  const handleDownloadItem = (item: LibraryItem) => {
-      if (item.productUrl) {
-          window.open(item.productUrl, '_blank');
-      } else {
-          const element = document.createElement("a");
-          const fileContent = `Thank you for downloading ${item.name} from A.S Studio!\n\nProduct: ${item.name}\nLicense: Royalty-Free\n\nDownload ID: ${item.id}`;
-          const file = new Blob([fileContent], {type: 'text/plain'});
-          element.href = URL.createObjectURL(file);
-          element.download = `${(item.name || 'product').replace(/\s+/g, '_')}_License.txt`;
-          document.body.appendChild(element);
-          element.click();
-          document.body.removeChild(element);
-      }
-  };
+  const tabs = [
+    { id: 'library', label: 'My Library', icon: Box },
+    { id: 'history', label: 'History', icon: Clock },
+    { id: 'downloads', label: 'Downloads', icon: Download },
+    { id: 'favorites', label: 'Favorites', icon: Heart },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
 
   const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'Completed': return 'text-green-600 dark:text-green-500 bg-green-100 dark:bg-green-500/10 border-green-200 dark:border-green-500/20';
-        case 'Processing': return 'text-blue-600 dark:text-blue-500 bg-blue-100 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20';
-        case 'Failed': return 'text-red-600 dark:text-red-500 bg-red-100 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
-        default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-zinc-700';
-      }
+    switch (status) {
+      case 'Completed': return 'text-green-600 dark:text-green-500 bg-green-100 dark:bg-green-500/10 border-green-200 dark:border-green-500/20';
+      case 'Processing': return 'text-blue-600 dark:text-blue-500 bg-blue-100 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20';
+      case 'Failed': return 'text-red-600 dark:text-red-500 bg-red-100 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
+      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-zinc-700';
+    }
   };
 
   if (authLoading) return <DashboardSkeleton />;
@@ -367,30 +470,19 @@ const UserDashboardContent: React.FC = () => {
                       ) : libraryItems.length > 0 ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {libraryItems.map((item, idx) => (
-                                  <div key={`${item.id}-${idx}`} className="group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 hover:border-rose-500/50 transition-all flex gap-4">
-                                      <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
-                                          <img 
-                                            src={item.image || `https://picsum.photos/seed/${item.id}/200`} 
-                                            alt={item.name} 
-                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                                          />
+                                  <div key={`${item.id}-${idx}`} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60 grayscale' : 'hover:border-rose-500/50'}`}>
+                                      <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
+                                          {item.isDeleted ? <Box className="w-8 h-8 text-gray-400" /> : <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                          <h3 className="font-bold text-gray-900 dark:text-white truncate">{item.name}</h3>
+                                          <h3 className="font-bold truncate text-gray-900 dark:text-white">{item.name}</h3>
                                           <p className="text-xs text-gray-500 mb-2">{item.category}</p>
-                                          <button 
-                                              onClick={() => handleDownloadItem(item)}
-                                              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
-                                          >
-                                              <Download className="w-3 h-3" /> Download
-                                          </button>
+                                          {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"><Download className="w-3 h-3" /> Download</button>}
                                       </div>
                                   </div>
                               ))}
                           </div>
-                      ) : (
-                          <EmptyState icon={Box} text="Your library is empty" actionText="Browse Shop" />
-                      )}
+                      ) : <EmptyState icon={Box} text="Your library is empty" actionText="Browse Shop" />}
                   </div>
                 )}
 
@@ -402,16 +494,10 @@ const UserDashboardContent: React.FC = () => {
                           orders.map((order) => (
                               <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                   <div className="flex items-center gap-4">
-                                      <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}>
-                                          <Package className="w-5 h-5" />
-                                      </div>
+                                      <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
                                       <div>
                                           <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
-                                          <div className="text-sm text-gray-500 flex items-center gap-2">
-                                              <span>{new Date(order.createdAt).toLocaleDateString()}</span>
-                                              <span>•</span>
-                                              <span>{order.items?.length || 0} Items</span>
-                                          </div>
+                                          <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
                                       </div>
                                   </div>
                                   <div className="flex items-center gap-4 w-full md:w-auto justify-between">
@@ -423,41 +509,56 @@ const UserDashboardContent: React.FC = () => {
                                   </div>
                               </div>
                           ))
-                      ) : (
-                          <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />
-                      )}
+                      ) : <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />}
                     </div>
                 )}
 
                 {activeTab === 'Downloads' && (
-                    <div>
-                      {libraryItems.length > 0 ? (
-                          <div className="space-y-3">
-                              {libraryItems.map((item, idx) => (
-                                  <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex items-center justify-between group hover:border-rose-500/30 transition-colors">
-                                      <div className="flex items-center gap-4">
-                                          <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0">
-                                              <img 
-                                                src={item.image || `https://picsum.photos/seed/${item.id}/200`} 
-                                                alt={item.name}
-                                                className="w-full h-full object-cover" 
-                                              />
-                                          </div>
-                                          <h3 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-rose-600 transition-colors">{item.name}</h3>
-                                      </div>
-                                      <button onClick={() => handleDownloadItem(item)} className="p-2 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-500 hover:text-rose-600 hover:border-rose-500 transition-all">
-                                          <Download className="w-4 h-4" />
-                                      </button>
-                                  </div>
-                              ))}
-                          </div>
-                      ) : (
-                          <EmptyState icon={Download} text="No downloads available" actionText="Browse Shop" />
-                      )}
-                    </div>
+                   <div>
+                    {libraryItems.length > 0 ? (
+                        <div className="space-y-3">
+                            {libraryItems.map((item, idx) => (
+                                <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                                            {item.isDeleted ? <Box className="w-4 h-4 text-gray-400" /> : <img src={item.image} className="w-full h-full object-cover" />}
+                                        </div>
+                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">{item.name}</h3>
+                                    </div>
+                                    {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="p-2 bg-white dark:bg-black rounded-lg border text-gray-500 hover:text-rose-600 transition-all"><Download className="w-4 h-4" /></button>}
+                                </div>
+                            ))}
+                        </div>
+                    ) : <EmptyState icon={Download} text="No downloads available" actionText="Browse Shop" />}
+                  </div>
                 )}
 
-                {activeTab === 'Favorites' && <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
+                {/* --- UPDATED FAVORITES TAB --- */}
+                {activeTab === 'Favorites' && (
+                    <div>
+                        {loadingFavorites ? (
+                            <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                        ) : favoriteItems.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {favoriteItems.map((item) => (
+                                    <div key={item.id} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60' : 'hover:border-rose-500/50'}`}>
+                                        <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
+                                            {!item.isDeleted && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className={`font-bold truncate ${item.isDeleted ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>{item.name}</h3>
+                                            <p className="text-xs text-gray-500 mb-3">{item.category}</p>
+                                            <div className="flex gap-4">
+                                                {!item.isDeleted && <Link href={`/product/${item.id}`} className="text-xs font-bold text-rose-600 hover:underline">View Item</Link>}
+                                                <button onClick={() => handleRemoveFavorite(item.id)} className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"><HeartOff className="w-3 h-3" /> Remove</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
+                    </div>
+                )}
 
                 {activeTab === 'Settings' && (
                     <div className="max-w-2xl space-y-8">
@@ -467,36 +568,21 @@ const UserDashboardContent: React.FC = () => {
                                   <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Display Name</label>
                                   <div className="relative">
                                       <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                                      <input 
-                                        type="text" 
-                                        value={displayName}
-                                        onChange={(e) => setDisplayName(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all font-medium" 
-                                      />
+                                      <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800/50 border outline-none focus:border-rose-500 transition-all font-medium" />
                                   </div>
                               </div>
                               <div className="space-y-2">
                                   <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Email Address</label>
                                   <div className="relative">
                                       <Shield className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                                      <input 
-                                        type="email" 
-                                        readOnly 
-                                        defaultValue={user?.email} 
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-500 cursor-not-allowed font-medium" 
-                                      />
+                                      <input type="email" readOnly defaultValue={user?.email} className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 dark:bg-zinc-900 border text-gray-500 cursor-not-allowed font-medium" />
                                   </div>
                               </div>
                           </div>
-                          
-                          <div className="flex gap-4">
-                              <button disabled={isSaving} type="submit" className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 flex items-center gap-2 disabled:opacity-70 active:scale-95">
-                                  {isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />}
-                                  Save Changes
-                              </button>
-                          </div>
+                          <button disabled={isSaving} type="submit" className="px-8 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all shadow-lg flex items-center gap-2 disabled:opacity-70">
+                              {isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Save Changes
+                          </button>
                       </form>
-
                       <div className="pt-8 border-t border-gray-100 dark:border-zinc-800">
                           <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Danger Zone</h3>
                           <div className="p-6 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-2xl flex items-center justify-between">
@@ -504,9 +590,7 @@ const UserDashboardContent: React.FC = () => {
                                   <h4 className="font-bold text-red-600 dark:text-red-500">Delete Account</h4>
                                   <p className="text-sm text-red-600/70 dark:text-red-400/70 mt-1">Permanently remove your data and access.</p>
                               </div>
-                              <button className="px-5 py-2.5 bg-white dark:bg-black text-red-600 font-bold rounded-xl border border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm flex items-center gap-2">
-                                  <Trash2 className="w-4 h-4" /> Delete
-                              </button>
+                              <button className="px-5 py-2.5 bg-white dark:bg-black text-red-600 font-bold rounded-xl border hover:bg-red-50 transition-colors text-sm flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete</button>
                           </div>
                       </div>
                     </div>
@@ -519,81 +603,26 @@ const UserDashboardContent: React.FC = () => {
 
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
-            <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            >
-                <motion.div 
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.95, opacity: 0 }}
-                    className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-6 w-full max-w-md border border-gray-200 dark:border-zinc-800"
-                >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-6 w-full max-w-md border">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white"><Upload className="w-5 h-5 text-rose-600" /> Adjust Image</h3>
-                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500">
-                            <X className="w-5 h-5" />
-                        </button>
+                        <h3 className="text-xl font-bold flex items-center gap-2"><Upload className="w-5 h-5 text-rose-600" /> Adjust Image</h3>
+                        <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full"><X className="w-5 h-5" /></button>
                     </div>
-
-                    <div className="relative w-full flex justify-center mb-6 overflow-hidden bg-gray-100 dark:bg-black rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-800">
-                        <div 
-                            className="relative overflow-hidden rounded-full shadow-[0_0_0_100px_rgba(255,255,255,0.9)] dark:shadow-[0_0_0_100px_rgba(0,0,0,0.8)] cursor-move touch-none"
-                            style={{ width: CROP_SIZE, height: CROP_SIZE }}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            onTouchStart={handleMouseDown}
-                            onTouchMove={handleMouseMove}
-                            onTouchEnd={handleMouseUp}
-                        >
-                            <img 
-                                ref={cropImgRef}
-                                src={cropImgSrc}
-                                onLoad={handleImageLoad}
-                                alt="Crop Preview"
-                                draggable={false}
-                                className="absolute max-w-none origin-top-left pointer-events-none select-none"
-                                style={{
-                                    transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
-                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                }}
-                            />
+                    <div className="relative w-full flex justify-center mb-6 overflow-hidden bg-gray-100 dark:bg-black rounded-2xl border-2 border-dashed">
+                        <div className="relative overflow-hidden rounded-full shadow-[0_0_0_100px_rgba(255,255,255,0.9)] dark:shadow-[0_0_0_100px_rgba(0,0,0,0.8)] cursor-move touch-none" style={{ width: CROP_SIZE, height: CROP_SIZE }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleMouseDown} onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}>
+                            <img ref={cropImgRef} src={cropImgSrc} onLoad={handleImageLoad} alt="Crop Preview" draggable={false} className="absolute max-w-none origin-top-left pointer-events-none" style={{ transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`, transition: isDragging ? 'none' : 'transform 0.1s ease-out' }} />
                         </div>
                     </div>
-
                     <div className="space-y-6">
                         <div className="flex items-center gap-4 px-2">
                             <ZoomOut className="w-4 h-4 text-gray-400" />
-                            <input 
-                                type="range" 
-                                min="1" 
-                                max="3" 
-                                step="0.1" 
-                                value={cropZoom}
-                                onChange={(e) => setCropZoom(parseFloat(e.target.value))}
-                                className="flex-1 accent-rose-600 h-1 bg-gray-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer"
-                            />
+                            <input type="range" min="1" max="3" step="0.1" value={cropZoom} onChange={(e) => setCropZoom(parseFloat(e.target.value))} className="flex-1 accent-rose-600 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
                             <ZoomIn className="w-4 h-4 text-gray-400" />
                         </div>
-
                         <div className="flex gap-3">
-                            <button 
-                                onClick={() => { setIsCropOpen(false); setCropImgSrc(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                                className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={handleSaveCrop}
-                                disabled={isSaving}
-                                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20"
-                            >
-                                {isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Save
-                            </button>
+                            <button onClick={() => { setIsCropOpen(false); setCropImgSrc(null); }} className="flex-1 py-3 border rounded-xl font-bold text-gray-600">Cancel</button>
+                            <button onClick={handleSaveCrop} disabled={isSaving} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 shadow-lg">{isSaving ? <Loader className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} Save</button>
                         </div>
                     </div>
                 </motion.div>
@@ -604,24 +633,12 @@ const UserDashboardContent: React.FC = () => {
   );
 };
 
-// Fixed the "any" type here
-interface EmptyStateProps {
-    icon: LucideIcon;
-    text: string;
-    actionText?: string;
-}
-
+interface EmptyStateProps { icon: LucideIcon; text: string; actionText?: string; }
 const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, text, actionText }) => (
     <div className="text-center py-20 bg-gray-50 dark:bg-zinc-800/20 rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-800">
-        <div className="w-16 h-16 bg-gray-200 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Icon className="w-8 h-8 text-gray-400 dark:text-zinc-600" />
-        </div>
+        <div className="w-16 h-16 bg-gray-200 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4"><Icon className="w-8 h-8 text-gray-400 dark:text-zinc-600" /></div>
         <p className="text-gray-500 font-medium mb-4">{text}</p>
-        {actionText && (
-            <Link href="/shop" className="text-rose-600 font-bold hover:underline">
-                {actionText}
-            </Link>
-        )}
+        {actionText && <Link href="/shop" className="text-rose-600 font-bold hover:underline">{actionText}</Link>}
     </div>
 );
 
