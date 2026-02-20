@@ -1,26 +1,36 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-// Added Image from next/image
 import Image from 'next/image'; 
 import { Upload as UploadIcon, X, FileAudio, Image as ImageIcon, Check, Loader, CloudUpload, Info, Calendar, HardDrive, Link as LinkIcon, Music, ZoomIn, ZoomOut, Plus, Layers } from 'lucide-react';
 import { ProductCategory } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import DescriptionEditor from './DescriptionEditor'; 
-import { collection, addDoc,doc,setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
-
 import { v4 as uuidv4 } from 'uuid';
-
-
-
-
-
 
 // --- APPWRITE IMPORTS ---
 import { storage, BUCKET_ID, ID } from '@/appwrite'; 
 
 const CROP_SIZE = 400;
+
+/**
+ * HELPER: Converts a Base64/DataURL string into a File object 
+ * so it can be uploaded like a normal image.
+ */
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[arr.length - 1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
 
 const AdminUploadView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -70,6 +80,7 @@ const AdminUploadView: React.FC = () => {
     rating: '5.0',
     uploadDate: new Date().toISOString().split('T')[0]
   });
+  
   const iduu = uuidv4();
   const productInputRef = useRef<HTMLInputElement>(null);
   const demoInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +89,7 @@ const AdminUploadView: React.FC = () => {
   const uploadToAppwrite = async (file: File): Promise<string> => {
     try {
         const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), file);
+        // Get the public preview/view URL
         return storage.getFileView(BUCKET_ID, uploaded.$id).toString(); 
     } catch (error) {
         console.error("Appwrite Upload Error:", error);
@@ -244,6 +256,7 @@ const AdminUploadView: React.FC = () => {
         let quality = 0.9;
         let dataUrl = await compressImage(canvas, quality);
 
+        // Compress until it's under a reasonable size for Base64 preview
         while (dataUrl.length > 68000 && quality > 0.1) {
             quality -= 0.1;
             dataUrl = await compressImage(canvas, quality);
@@ -271,26 +284,36 @@ const AdminUploadView: React.FC = () => {
     try {
       let finalProductUrl = productUrl;
       let finalDemoUrl = demoUrl;
+      let finalCoverUrl = ""; // This will hold the Appwrite URL
 
+      // 1. Upload Product File
       if (productType === 'file' && productFile) {
         finalProductUrl = await uploadToAppwrite(productFile);
       }
 
+      // 2. Upload Demo Track
       if (demoType === 'file' && demoFile) {
         finalDemoUrl = await uploadToAppwrite(demoFile);
       }
 
+      // 3. Upload Screenshots
       const screenshotUrls = await Promise.all(
         screenshotFiles.map(file => uploadToAppwrite(file))
       );
       
+      // 4. CONVERT BASE64 COVER TO FILE & UPLOAD TO APPWRITE
+      if (coverPreview && coverPreview.startsWith('data:image')) {
+        const coverFile = dataURLtoFile(coverPreview, `cover-${iduu}.jpg`);
+        finalCoverUrl = await uploadToAppwrite(coverFile);
+      }
+      
       function replaceWhiteWithDash(str: string): string {
             return str.replace(/\s+/g, '-');
-          }
+      }
                 
-      const finalCoverUrl = coverPreview;
       const dataId = `${replaceWhiteWithDash(formData.name)}-${iduu}`;
       
+      // 5. Save to Firestore (with Appwrite URL instead of Base64)
       await setDoc(doc(collection(db, "products"), dataId), {
         name: formData.name,
         category: formData.category,
@@ -304,16 +327,16 @@ const AdminUploadView: React.FC = () => {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
-        image: finalCoverUrl,
+        image: finalCoverUrl, // Now a standard Appwrite URL
         screenshots: screenshotUrls,
         downloadType: productType,
         productUrl: finalProductUrl || null,
         demoUrl: finalDemoUrl || null,
       });
 
-
       alert("Product successfully published!");
 
+      // Reset Form
       setProductFile(null); setProductUrl('');
       setDemoFile(null); setDemoUrl('');
       setScreenshotFiles([]); setScreenshotPreviews([]);
@@ -573,7 +596,6 @@ const AdminUploadView: React.FC = () => {
                     <div className="space-y-2.5 flex flex-col h-full min-h-[300px]">
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Description</label>
                         <div className="flex-1 rounded-xl overflow-hidden focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all z-10">
-                            {/* REMOVED invalid onToast prop */}
                             <DescriptionEditor 
                                 value={formData.description}
                                 onChange={(val) => setFormData({...formData, description: val})}
@@ -739,18 +761,18 @@ const AdminUploadView: React.FC = () => {
                             onTouchMove={handleMouseMove}
                             onTouchEnd={handleMouseUp}
                         >
-<img
-    ref={cropImgRef}
-    src={cropImgSrc}
-    alt="Crop Preview"
-    draggable={false}
-    onLoad={handleImageLoad}
-    className="absolute max-w-none origin-top-left pointer-events-none select-none"
-    style={{
-        transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
-        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-    }}
-/>
+                        <img
+                            ref={cropImgRef}
+                            src={cropImgSrc}
+                            alt="Crop Preview"
+                            draggable={false}
+                            onLoad={handleImageLoad}
+                            className="absolute max-w-none origin-top-left pointer-events-none select-none"
+                            style={{
+                                transform: `translate3d(${cropOffset.x}px, ${cropOffset.y}px, 0) scale(${baseScale * cropZoom})`,
+                                transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                            }}
+                        />
                         </div>
                     </div>
 
