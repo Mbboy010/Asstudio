@@ -97,7 +97,7 @@ const AdminProductsView: React.FC = () => {
       description: product.description,
       image: product.image || '',
       size: product.size || '',
-      uploadDate: product.uploadDate,
+      uploadDate: product.uploadDate || '',
       tagsInput: product.features ? product.features.join(', ') : '',
       productUrl: product.productUrl || '',
       demoUrl: product.demoUrl || '',
