@@ -4,8 +4,6 @@ import { notFound } from 'next/navigation';
 import { adminDb } from '@/lib/firebaseAdmin';
 import ProductDetailContent from "@/components/product/ProductDetailContent";
 
-export const revalidate = 60; // helps crawlers
-
 interface Product {
   id: string;
   name?: string;
@@ -17,6 +15,8 @@ interface Product {
 
 const stripHtml = (html: string) =>
   html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
+  
+  
 
 async function getProduct(id: string): Promise<Product | null> {
   try {
@@ -45,48 +45,34 @@ async function getProduct(id: string): Promise<Product | null> {
   }
 }
 
-export async function generateMetadata(
-  { params }: { params: { id: string } }   // ✅ NOT Promise
-): Promise<Metadata> {
 
-  const { id } = params;
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await params;
+
   const product = await getProduct(id);
 
   if (!product) {
     return { title: 'Product Not Found' };
+    
   }
-
-  const siteUrl = "https://asstudio.vercel.app"; // ⚠️ change if custom domain
 
   const title = `${product.name || 'Product'} | AS Studio`;
   const description = stripHtml(
     product.description || 'Exclusive digital assets.'
   );
-
-  // ✅ Force absolute image URL
   const imageUrl =
-    product.image?.startsWith("http")
-      ? product.image
-      : product.image
-        ? `${siteUrl}${product.image}`
-        : `${siteUrl}/og-default.jpg`;
+    product.image || 'https://asstudio.vercel.app/android-chrome-512x512.png';
 
   return {
-    metadataBase: new URL(siteUrl),  // ✅ important
     title,
     description,
     openGraph: {
       title,
       description,
-      url: `${siteUrl}/product/${id}`,
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: product.name || "AS Studio Product",
-        },
-      ],
+      images: [{ url: imageUrl, width: 1200, height: 630 }],
       type: 'website',
     },
     twitter: {
@@ -99,13 +85,14 @@ export async function generateMetadata(
 }
 
 export default async function Page(
-  { params }: { params: { id: string } }   // ✅ NOT Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const product = await getProduct(id);
 
   if (!product) {
+    console.log(product)
     notFound();
   }
 
