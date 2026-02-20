@@ -135,14 +135,15 @@ export const ProductHero = ({
           
           {/* Main Image */}
           {product.image ? (
-            <Image 
-              src={product.image} 
-              alt={product.name} 
-              fill
-              priority 
-              className={`object-cover transition-transform duration-700 ${isPlaying ? 'scale-105' : 'group-hover:scale-105'}`}
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            // Instead of 'fill', we use CSS classes to cover the container
+            className={`w-full h-full object-cover transition-transform duration-700 ${
+              isPlaying ? 'scale-105' : 'group-hover:scale-105'
+            }`}
+            loading="eager" // Use 'eager' for Hero images to prevent flickering
+          />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-zinc-800 text-gray-300">
               <Zap className="w-20 h-20" />
