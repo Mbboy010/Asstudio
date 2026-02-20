@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { 
-  Plus, Edit2, Trash2, Image as ImageIcon, X, Upload, Save, 
-  Loader, Music, ZoomIn, ZoomOut, Tag, DollarSign, Calendar, HardDrive, Check, CloudUpload
+  Plus, Edit2, Trash2, Image as ImageIcon, X, Save, 
+  Loader, Music, CloudUpload, HardDrive, Calendar, Tag
 } from 'lucide-react';
 import { ProductCategory, Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -45,7 +46,7 @@ const AdminProductsView: React.FC = () => {
     category: ProductCategory.SAMPLE_PACK,
     price: '',
     description: '',
-    image: '', // Holds URL or Base64 preview
+    image: '', 
     size: '', 
     uploadDate: new Date().toISOString().split('T')[0],
     tagsInput: '', 
@@ -63,7 +64,6 @@ const AdminProductsView: React.FC = () => {
   const [baseScale, setBaseScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isProcessingCrop, setIsProcessingCrop] = useState(false);
 
   const cropImgRef = useRef<HTMLImageElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -95,9 +95,9 @@ const AdminProductsView: React.FC = () => {
       category: product.category,
       price: product.price.toString(),
       description: product.description,
-      image: product.image || '',
+      image: product.image || '', // Fixed TypeScript null error
       size: product.size || '',
-      uploadDate: product.uploadDate || '',
+      uploadDate: product.uploadDate,
       tagsInput: product.features ? product.features.join(', ') : '',
       productUrl: product.productUrl || '',
       demoUrl: product.demoUrl || '',
@@ -139,25 +139,14 @@ const AdminProductsView: React.FC = () => {
       let finalDemoUrl = formData.demoUrl;
       let finalImageUrl = formData.image;
 
-      // 1. Upload Product File if new one selected
-      if (productFile) {
-        finalProductUrl = await uploadToAppwrite(productFile);
-      }
-
-      // 2. Upload Audio Demo if new one selected
-      if (audioFile) {
-        finalDemoUrl = await uploadToAppwrite(audioFile);
-      }
-
-      // 3. Upload Image if it's a new Base64 crop
+      if (productFile) finalProductUrl = await uploadToAppwrite(productFile);
+      if (audioFile) finalDemoUrl = await uploadToAppwrite(audioFile);
+      
+      // If image is a fresh crop (base64), upload it to Appwrite
       if (formData.image.startsWith('data:image')) {
         const imageFile = dataURLtoFile(formData.image, `edit-${uuidv4()}.jpg`);
         finalImageUrl = await uploadToAppwrite(imageFile);
       }
-
-      const processedFeatures = formData.tagsInput 
-        ? formData.tagsInput.split(',').map(t => t.trim()).filter(Boolean) 
-        : [];
 
       const submissionData = {
         name: formData.name,
@@ -166,7 +155,7 @@ const AdminProductsView: React.FC = () => {
         description: formData.description,
         image: finalImageUrl,
         size: formData.size,
-        features: processedFeatures,
+        features: formData.tagsInput.split(',').map(t => t.trim()).filter(Boolean),
         uploadDate: formData.uploadDate,
         productUrl: finalProductUrl,
         demoUrl: finalDemoUrl,
@@ -182,14 +171,11 @@ const AdminProductsView: React.FC = () => {
       
       await fetchProducts();
       setIsModalOpen(false);
-      alert("Changes saved successfully!");
     } catch (error) {
       console.error(error);
-      alert("Failed to save product.");
     } finally { setIsSaving(false); }
   };
 
-  // --- CROP HANDLERS (Same as Upload View) ---
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const reader = new FileReader();
@@ -203,9 +189,8 @@ const AdminProductsView: React.FC = () => {
     }
   };
 
-  const handleSaveCrop = async () => {
+  const handleSaveCrop = () => {
     if (!cropImgRef.current) return;
-    setIsProcessingCrop(true);
     const canvas = document.createElement('canvas');
     canvas.width = CROP_SIZE; canvas.height = CROP_SIZE;
     const ctx = canvas.getContext('2d');
@@ -215,7 +200,6 @@ const AdminProductsView: React.FC = () => {
         ctx.drawImage(cropImgRef.current, cropOffset.x, cropOffset.y, imgDimensions.width * baseScale * cropZoom, imgDimensions.height * baseScale * cropZoom);
         setFormData(prev => ({...prev, image: canvas.toDataURL('image/jpeg', 0.8)}));
     }
-    setIsProcessingCrop(false);
     setIsCropOpen(false);
   };
 
@@ -229,14 +213,14 @@ const AdminProductsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 bg-gray-50 dark:bg-black min-h-screen py-6 px-4 transition-colors duration-300">
+    <div className="space-y-8 bg-gray-50 dark:bg-black min-h-screen py-6 px-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-gray-200 dark:border-zinc-800 pb-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900 dark:text-white">Product Management</h1>
-          <p className="text-gray-500 font-medium">Edit inventory and manage cloud assets.</p>
+          <p className="text-gray-500 font-medium">Manage and edit your digital store inventory.</p>
         </div>
-        <button onClick={handleAdd} className="bg-rose-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-700 active:scale-95 transition-all shadow-lg shadow-rose-600/20">
+        <button onClick={handleAdd} className="bg-rose-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20">
           <Plus className="w-5 h-5" /> Add New Product
         </button>
       </div>
@@ -248,7 +232,9 @@ const AdminProductsView: React.FC = () => {
           {products.map((product) => (
             <div key={product.id} className="group bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 overflow-hidden hover:shadow-xl transition-all">
               <div className="aspect-square relative overflow-hidden bg-gray-100 dark:bg-zinc-800">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                {product.image && (
+                  <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                )}
                 <div className="absolute top-3 right-3 flex gap-2">
                    <button onClick={() => handleEdit(product)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-rose-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
                    <button onClick={() => handleDelete(product.id)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
@@ -266,7 +252,7 @@ const AdminProductsView: React.FC = () => {
         </div>
       )}
 
-      {/* EDIT/ADD MODAL */}
+      {/* MODAL */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -274,8 +260,8 @@ const AdminProductsView: React.FC = () => {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-5xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               
               <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-zinc-800">
-                 <h2 className="text-2xl font-black text-gray-900 dark:text-white">{editingId ? 'Edit Product' : 'New Product'}</h2>
-                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-6 h-6" /></button>
+                 <h2 className="text-2xl font-black">{editingId ? 'Edit Product' : 'New Product'}</h2>
+                 <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800"><X className="w-6 h-6" /></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6">
@@ -284,23 +270,23 @@ const AdminProductsView: React.FC = () => {
                   <div className="md:col-span-4 space-y-6">
                     <div className="space-y-2">
                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Cover Image</label>
-                       <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800/50 group">
+                       <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800 group">
                           <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageInput} />
-                          {formData.image ? <img src={formData.image} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
+                          {formData.image ? <Image src={formData.image} alt="Preview" fill className="object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold transition-opacity">Change Image</div>
                        </div>
                     </div>
 
                     <div className="bg-gray-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Files</label>
-                       <div onClick={() => productFileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-900/10 cursor-pointer transition-colors">
+                       <div onClick={() => productFileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-900/10 cursor-pointer">
                            <input type="file" ref={productFileInputRef} className="hidden" onChange={(e) => setProductFile(e.target.files?.[0] || null)} />
                            <CloudUpload className="w-6 h-6 text-rose-500 mb-1" />
                            <span className="text-[10px] font-bold text-center truncate w-full">{productFile ? productFile.name : 'Replace Product File (ZIP)'}</span>
                        </div>
                        
                        <div className="space-y-2">
-                         <div className="flex items-center gap-2 text-xs font-bold text-gray-500"><Music className="w-3.5 h-3.5"/> Replace Audio Demo</div>
+                         <div className="flex items-center gap-2 text-xs font-bold text-gray-500"><Music className="w-3.5 h-3.5"/> Audio Demo</div>
                          <input type="file" accept="audio/*" className="w-full text-[10px] file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-rose-600 file:text-white" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
                        </div>
                     </div>
@@ -310,11 +296,11 @@ const AdminProductsView: React.FC = () => {
                   <div className="md:col-span-8 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Name</label>
+                        <label className="text-sm font-bold">Name</label>
                         <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 font-bold focus:border-rose-500 outline-none" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Category</label>
+                        <label className="text-sm font-bold">Category</label>
                         <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as ProductCategory})} className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none cursor-pointer">
                           {Object.values(ProductCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
@@ -323,15 +309,15 @@ const AdminProductsView: React.FC = () => {
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-bold">Price (₦)</label>
+                        <label className="text-sm font-bold flex items-center gap-2"><Tag className="w-3.5 h-3.5"/> Price (₦)</label>
                         <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 font-mono font-bold" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold">Size</label>
+                        <label className="text-sm font-bold flex items-center gap-2"><HardDrive className="w-3.5 h-3.5"/> Size</label>
                         <input placeholder="1.2 GB" value={formData.size} onChange={e => setFormData({...formData, size: e.target.value})} className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold">Date</label>
+                        <label className="text-sm font-bold flex items-center gap-2"><Calendar className="w-3.5 h-3.5"/> Date</label>
                         <input type="date" value={formData.uploadDate} onChange={e => setFormData({...formData, uploadDate: e.target.value})} className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-xs" />
                       </div>
                     </div>
@@ -350,7 +336,7 @@ const AdminProductsView: React.FC = () => {
               </div>
 
               <div className="p-6 border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex gap-4">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500">Cancel</button>
                  <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all flex items-center justify-center gap-2">
                    {isSaving ? <Loader className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5" />} 
                    {editingId ? 'Update Product' : 'Create Product'}
@@ -361,11 +347,11 @@ const AdminProductsView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* CROP MODAL (Same as Upload View) */}
+      {/* CROP MODAL */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-zinc-900 p-6 rounded-3xl max-w-lg w-full">
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl max-w-lg w-full">
                     <h3 className="text-xl font-black mb-6 dark:text-white">Adjust Image</h3>
                     <div className="relative overflow-hidden bg-black rounded-xl mb-6 flex justify-center items-center" style={{ width: '100%', height: CROP_SIZE }}>
                         <div 
@@ -391,7 +377,7 @@ const AdminProductsView: React.FC = () => {
                         <button onClick={() => setIsCropOpen(false)} className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold dark:text-white">Cancel</button>
                         <button onClick={handleSaveCrop} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold">Apply</button>
                     </div>
-                </motion.div>
+                </div>
             </div>
         )}
       </AnimatePresence>
