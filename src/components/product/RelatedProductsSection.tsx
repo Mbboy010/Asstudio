@@ -13,7 +13,9 @@ const RelatedProductCard = ({ item }: { item: Product }) => (
       />  
     </div>  
     <h4 className="text-xs font-bold truncate dark:text-white">{item.name}</h4>  
-    <p className="text-[10px] text-rose-600 font-bold">₦{item.price.toLocaleString()}</p>  
+    <p className="text-[10px] text-rose-600 font-bold">
+      {item.price === 0 ? 'Free' : `₦${item.price.toLocaleString()}`}
+    </p>  
   </Link>  
 );
 
