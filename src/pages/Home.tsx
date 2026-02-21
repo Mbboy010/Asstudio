@@ -119,8 +119,8 @@ const HomeContent: React.FC = () => {
               <Link href="/shop" className="px-8 py-4 bg-rose-600 text-white font-bold rounded-full hover:bg-rose-700 transition-all hover:scale-105 shadow-lg shadow-rose-500/20">
                   Browse Catalog
               </Link>
-              <Link href="/shop?category=VST_PLUGIN" className="px-8 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors">
-                Latest Plugins
+              <Link href="https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk" className="px-8 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors">
+                A.S STUDIO YouTube
               </Link>
             </motion.div>
           </motion.div>
@@ -207,10 +207,10 @@ const HomeContent: React.FC = () => {
          <div className="container mx-auto px-4 relative z-10">
             <div className="flex justify-between items-end mb-10">
                <div>
-                  <h2 className="text-3xl md:text-4xl font-black text-white">A.S STUDIO YouTube</h2>
+                  <h2 className="text-3xl md:text-4xl font-black text-white">LATEST PLUGINS</h2>
                   <p className="text-gray-400 mt-2">Professional audio effects and instruments</p>
                </div>
-               <Link href={`https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk`} className="text-rose-500 hover:text-white transition-colors flex items-center gap-2">
+               <Link href={`/shop?category=${ProductCategory.VST_PLUGIN}`} className="text-rose-500 hover:text-white transition-colors flex items-center gap-2">
                   View All <ArrowRight className="w-4 h-4"/>
                </Link>
             </div>
