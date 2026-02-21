@@ -1,9 +1,9 @@
 import React from 'react';
 import { Metadata } from 'next';
-import UserDashboardContent from "@/Dashboard/dashboard";
+import UserDashboardContent from "@/dashboard/Dashboard";
 
 // Define your base URL (replace with your actual domain)
-const SITE_URL = 'https://asstudio.vercel.app/';
+const SITE_URL = 'https://asstudio.vercel.app';
 
 export const metadata: Metadata = {
   title: 'My Account | A.S STUDIO',
