@@ -207,10 +207,10 @@ const HomeContent: React.FC = () => {
          <div className="container mx-auto px-4 relative z-10">
             <div className="flex justify-between items-end mb-10">
                <div>
-                  <h2 className="text-3xl md:text-4xl font-black text-white">LATEST PLUGINS</h2>
+                  <h2 className="text-3xl md:text-4xl font-black text-white">A.S STUDIO YouTube</h2>
                   <p className="text-gray-400 mt-2">Professional audio effects and instruments</p>
                </div>
-               <Link href={`/shop?category=${ProductCategory.VST_PLUGIN}`} className="text-rose-500 hover:text-white transition-colors flex items-center gap-2">
+               <Link href={`https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk`} className="text-rose-500 hover:text-white transition-colors flex items-center gap-2">
                   View All <ArrowRight className="w-4 h-4"/>
                </Link>
             </div>
@@ -266,7 +266,7 @@ const HomeContent: React.FC = () => {
                      </div>
                      <div className="flex-1">
                         <h4 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-rose-500 transition-colors">{pack.name}</h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{pack.description || 'High quality WAV samples.'}</p>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{pack.description || 'High quality WAV samples.'}</div>
                      </div>
                      <div className="text-right">
                         <div className="font-mono font-bold text-gray-900 dark:text-white">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</div>
