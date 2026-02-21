@@ -96,7 +96,7 @@ export const ProductHero = ({
 
   // Wrapper for Download to increment count
   const onDownloadClick = async (isDemo: boolean) => {
-    handleDownload(isDemo); // Run your original prop function
+    handleDownload(isDemo); 
     
     if (product?.id) {
       try {
@@ -112,7 +112,7 @@ export const ProductHero = ({
 
   // Wrapper for Add to Cart to increment count
   const onAddToCartClick = async (prod: ExtendedProduct) => {
-    handleAddToCart(prod); // Run your original prop function
+    handleAddToCart(prod); 
 
     if (product?.id) {
       try {
@@ -138,11 +138,10 @@ export const ProductHero = ({
           <img 
             src={product.image} 
             alt={product.name} 
-            // Instead of 'fill', we use CSS classes to cover the container
             className={`w-full h-full object-cover transition-transform duration-700 ${
               isPlaying ? 'scale-105' : 'group-hover:scale-105'
             }`}
-            loading="eager" // Use 'eager' for Hero images to prevent flickering
+            loading="eager" 
           />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-zinc-800 text-gray-300">
@@ -150,15 +149,15 @@ export const ProductHero = ({
             </div>
           )}
 
-          {/* Overlay Gradient (for text readability if needed) */}
+          {/* Overlay Gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
 
-          {/* Floating Audio Player Glass Card */}
-          {product.demoUrl && (
+          {/* FIX APPLIED HERE: Added stricter string check before rendering player */}
+          {typeof product.demoUrl === 'string' && product.demoUrl.trim() !== '' && (
             <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
               <div className="bg-white/10 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/10 p-5 rounded-3xl shadow-lg ring-1 ring-black/5 overflow-hidden relative">
                 
-                {/* Visualizer Animation (Decorative) */}
+                {/* Visualizer Animation */}
                 {isPlaying && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-1 h-full w-full opacity-10 justify-center items-center pointer-events-none">
                      {[...Array(12)].map((_, i) => (
@@ -203,19 +202,23 @@ export const ProductHero = ({
                         className="absolute top-0 left-0 h-full bg-white rounded-full transition-all duration-100 ease-linear pointer-events-none" 
                         style={{ width: `${progressPercent}%` }}
                       >
-                        {/* Thumb Knob */}
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-md scale-0 group-hover/slider:scale-100 transition-transform" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Hidden Audio Element */}
+                {/* FIX APPLIED HERE: Hidden Audio Element with Error Handling and Preload */}
                 <audio 
                   ref={audioRef} 
                   src={product.demoUrl} 
+                  preload="metadata"
                   onTimeUpdate={handleTimeUpdate} 
                   onEnded={() => setIsPlaying(false)} 
+                  onError={(e) => {
+                    console.error("Audio Load Error. Check URL or CORS settings:", product.demoUrl);
+                    setIsPlaying(false);
+                  }}
                 />
               </div>
             </div>
@@ -314,10 +317,9 @@ export const ProductHero = ({
 
           <div className="flex flex-col gap-4">
             {product.price === 0 ? (
-              /* --- FREE DOWNLOAD STATE --- */
               <div className="space-y-4">
                 <button 
-                  onClick={() => onDownloadClick(false)} // UPDATED HERE
+                  onClick={() => onDownloadClick(false)}
                   disabled={isDownloading} 
                   className="group relative w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-black font-bold text-lg rounded-2xl flex items-center justify-center gap-3 overflow-hidden transition-all hover:shadow-2xl hover:shadow-gray-900/20 dark:hover:shadow-white/20 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
                 >
@@ -330,25 +332,24 @@ export const ProductHero = ({
                 </p>
               </div>
             ) : (
-              /* --- PAID STATE --- */
               <div className="flex flex-col sm:flex-row gap-4">
                 <button 
-                  onClick={() => onAddToCartClick(product)} // UPDATED HERE
+                  onClick={() => onAddToCartClick(product)}
                   className="flex-[2] py-5 bg-rose-600 text-white font-bold text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-rose-700 hover:shadow-xl hover:shadow-rose-600/30 transition-all active:scale-[0.98]"
                 >
                   <ShoppingCart className="w-5 h-5" /> 
                   Add To Cart
                 </button>
-                {product.demoUrl && (
+                {/* FIX APPLIED HERE: Stricter check for the Demo button too */}
+                {typeof product.demoUrl === 'string' && product.demoUrl.trim() !== '' && (
                   <button 
-                    onClick={() => onDownloadClick(true)} // UPDATED HERE
+                    onClick={() => onDownloadClick(true)}
                     className="flex-1 py-5 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white border border-gray-200 dark:border-zinc-700 font-bold text-lg rounded-2xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Download className="w-5 h-5 opacity-50" />
                     Demo
                   </button>
                 )}
-                {/* --- UPDATED FAVORITE BUTTON --- */}
                 <button 
                   onClick={toggleFavorite}
                   className="p-5 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
@@ -362,7 +363,6 @@ export const ProductHero = ({
         
         {/* Bottom Trust Indicators */}
         <div className="mt-8 flex items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-           {/* You can add payment icons here (Visa, MC, etc) if available in your project */}
            <div className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">
              Guaranteed Safe Checkout
            </div>
