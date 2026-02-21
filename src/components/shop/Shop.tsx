@@ -295,7 +295,7 @@ const ShopContent: React.FC = () => {
               <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
                    // 4. FIXED: Replaced <img> with optimized <Image />
-                   <Image 
+                   <img 
                     src={product.image} 
                     alt={product.name}
                     className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" 
