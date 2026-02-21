@@ -266,7 +266,7 @@ const HomeContent: React.FC = () => {
                      </div>
                      <div className="flex-1">
                         <h4 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-rose-500 transition-colors">{pack.name}</h4>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{pack.description || 'High quality WAV samples.'}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{pack.category || 'High quality WAV samples.'}</div>
                      </div>
                      <div className="text-right">
                         <div className="font-mono font-bold text-gray-900 dark:text-white">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</div>
