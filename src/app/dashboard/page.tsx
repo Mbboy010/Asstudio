@@ -1,6 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
-import UserDashboardContent from "@/dashboard/Dashboard";
+import UserDashboardContent from "@/components/dashboard/Dashboard";
 
 // Define your base URL (replace with your actual domain)
 const SITE_URL = 'https://asstudio.vercel.app';
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     type: 'website',
   },
 
-  // 3. X / TWITTER
+  // 3. X / TWITTER..
   twitter: {
     card: 'summary_large_image',
     title: 'My Dashboard | A.S STUDIO',
