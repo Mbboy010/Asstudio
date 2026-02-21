@@ -15,42 +15,37 @@ export default function AuthGuard({ children }: AuthGuardProps): any {
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    // 1. Wait until Firebase Auth has finished determining the user's state
     if (loading) return;
 
-    // 2. Define your route categories based on the URL path
+    // 1. Identify where the user is trying to go
     const isAdminRoute = pathname?.startsWith('/mb/admin');
     const isUserProtectedRoute = pathname?.startsWith('/dashboard');
     const isAuthRoute = ['/login', '/signup', '/forgot-password'].includes(pathname || '');
 
-    // 3. Rule: Logged-in users should not access Auth pages (login, signup, etc.)
-    if (isAuthRoute && user) {
-      router.push('/dashboard');
+    // 2. THE FIX: If logged in and trying to visit /signup, /login, etc.
+    if (user && isAuthRoute) {
+      router.replace('/dashboard'); // Use replace so they can't go "back" to signup
       return;
     }
 
-    // 4. Rule: Guests cannot access protected user routes or admin routes
-    if ((isUserProtectedRoute || isAdminRoute) && !user) {
-      router.push(`/login?returnUrl=${encodeURIComponent(pathname || '/')}`);
+    // 3. If guest and trying to visit protected pages
+    if (!user && (isUserProtectedRoute || isAdminRoute)) {
+      router.replace(`/login?returnUrl=${encodeURIComponent(pathname || '/')}`);
       return;
     }
 
-    // 5. Rule: Regular logged-in users cannot access the admin panel
-    if (isAdminRoute && user && !isAdmin) {
-      router.push('/shop'); // Or send them to '/dashboard'
+    // 4. If logged in but trying to visit admin without permission
+    if (user && isAdminRoute && !isAdmin) {
+      router.replace('/shop');
       return;
     }
 
-    // 6. If no redirect rules were triggered, authorize the render
+    // 5. Otherwise, they are allowed to see the page
     setAuthorized(true);
-  }, [pathname, user, loading, isAdmin, router]);
+  }, [user, loading, isAdmin, pathname, router]);
 
-  // Render absolutely nothing (null) while loading or if unauthorized 
-  // This completely eliminates UI flickering and ensures strictly NO JSX is output
-  if (loading || !authorized) {
-    return null;
-  }
+  // Return nothing while the logic is deciding where to send the user
+  if (loading || !authorized) return null;
 
-  // Render the page's actual content once authorized
   return children;
 }
