@@ -5,6 +5,9 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Layout as MainLayout } from "@/components/Layout"; 
 
+import { AuthProvider } from "./AuthContext";
+import AuthGuard from "./AuthGuard";
+
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
@@ -51,12 +54,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${firaCode.variable} font-sans`}>
-        <Providers>
+        
+        <AuthProvider>
+          <AuthGuard>
+           <Providers>
             {/* We wrap the inner content with the existing Layout component for Navbar/Footer */}
             <MainLayout> 
               {children}
             </MainLayout>
         </Providers>
+          </AuthGuard>
+         </AuthProvider>
       </body>
     </html>
   );
