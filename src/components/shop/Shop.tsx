@@ -298,8 +298,7 @@ const ShopContent: React.FC = () => {
                    <Image 
                     src={product.image} 
                     alt={product.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" 
                    />
                 ) : (
                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
