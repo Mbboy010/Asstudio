@@ -2,12 +2,20 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, DocumentData } from 'firebase/firestore';
 import { auth, db } from '@/firebase';
+
+// Define the shape of your Firestore user document
+interface UserData extends DocumentData {
+  role?: string;
+  name?: string;
+  email?: string;
+  // Add other fields you expect from Firestore here
+}
 
 interface AuthContextType {
   user: User | null;
-  userData: any | null; // Data from Firestore (role, name, etc.)
+  userData: UserData | null; 
   loading: boolean;
   isAdmin: boolean;
 }
@@ -21,7 +29,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userData, setUserData] = useState<any | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,10 +38,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         
-        // Fetch the specific 'role' from your Firestore users collection
         const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
         if (userDoc.exists()) {
-          setUserData(userDoc.data());
+          setUserData(userDoc.data() as UserData);
         }
       } else {
         setUser(null);
@@ -54,5 +61,4 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// This is the hook you import in your AuthGuard
 export const useAuth = () => useContext(AuthContext);
