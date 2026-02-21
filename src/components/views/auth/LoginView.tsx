@@ -65,7 +65,7 @@ const LoginView: React.FC = () => {
         });
       }
 
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err: unknown) { // Changed 'any' to 'unknown'
       const firebaseError = err as FirebaseError;
       setError(firebaseError.message.replace('Firebase: ', ''));
@@ -109,9 +109,9 @@ const LoginView: React.FC = () => {
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Password</label>
-            <Link href="/forgot-password" className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline transition-colors">
+            <a href="/forgot-password" className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline transition-colors">
                 Forgot password?
-            </Link>
+            </a>
           </div>
           <div className="relative group">
             <div className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-rose-600 transition-colors">
@@ -164,7 +164,7 @@ const LoginView: React.FC = () => {
 
       <div className="text-center text-sm text-gray-500 mt-8">
          {/* Fixed: Escaped apostrophe here */}
-         Don&apos;t have an account? <Link href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</Link>
+         Don&apos;t have an account? <a href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</a>
       </div>
     </AuthLayout>
   );

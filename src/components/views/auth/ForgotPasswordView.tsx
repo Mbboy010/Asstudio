@@ -47,9 +47,9 @@ const ForgotPasswordView: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 mb-8 text-lg">
             We have sent a password reset link to <span className="font-bold text-gray-900 dark:text-white">{email}</span>. Please check your email.
           </p>
-          <Link href="/login" className="inline-flex items-center justify-center gap-2 text-rose-600 font-bold hover:underline transition-all hover:gap-3">
+          <a href="/login" className="inline-flex items-center justify-center gap-2 text-rose-600 font-bold hover:underline transition-all hover:gap-3">
             <ArrowLeft className="w-4 h-4" /> Back to Login
-          </Link>
+          </a>
         </div>
       </AuthLayout>
     );

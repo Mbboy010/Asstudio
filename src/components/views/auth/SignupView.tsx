@@ -62,7 +62,7 @@ const SignupView: React.FC = () => {
         joinedAt: new Date().toISOString()
       });
 
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err: unknown) { // Changed 'any' to 'unknown'
       const firebaseError = err as FirebaseError;
       let msg = firebaseError.message.replace('Firebase: ', '');
@@ -258,7 +258,7 @@ const SignupView: React.FC = () => {
       <SocialLogin onClick={handleGoogleLogin} />
 
       <div className="text-center text-sm text-gray-500 mt-8">
-         Already have an account? <Link href="/login" className="text-rose-600 font-bold hover:underline">Log In</Link>
+         Already have an account? <a href="/login" className="text-rose-600 font-bold hover:underline">Log In</a>
       </div>
     </AuthLayout>
   );
