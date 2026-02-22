@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
   ArrowRight, Zap, Layers, Smartphone, Cpu, Sliders, 
-  Star, Image as ImageIcon, Activity, Music, Download
+  Star, Image as ImageIcon, Activity, Music, Download, Monitor
 } from 'lucide-react';
 import { ProductCategory, Product } from '@/types';
 import { HeroSkeleton } from '@/components/ui/Skeleton';
@@ -34,6 +34,10 @@ const HomeContent: React.FC = () => {
   const [latestPlugins, setLatestPlugins] = useState<Product[]>([]);
   const [presetPacks, setPresetPacks] = useState<Product[]>([]);
   const [samplePacks, setSamplePacks] = useState<Product[]>([]);
+  
+  // NEW: State for Mobile and Desktop apps
+  const [mobileApps, setMobileApps] = useState<Product[]>([]);
+  const [desktopApps, setDesktopApps] = useState<Product[]>([]);
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -60,6 +64,15 @@ const HomeContent: React.FC = () => {
         // 4. Sample Packs (Top 3)
         setSamplePacks(allProducts.filter(p => p.category === ProductCategory.SAMPLE_PACK).slice(0, 3));
 
+        // 5. Mobile Apps (Top 4)
+        setMobileApps(allProducts.filter(p => p.category === ProductCategory.MOBILE_APP).slice(0, 4));
+
+        // 6. Desktop Apps (Top 3) - Note: Ensure DESKTOP_APP exists in your ProductCategory enum
+        setDesktopApps(allProducts.filter(p => 
+          p.category === ('DESKTOP_APP' as ProductCategory) || 
+          p.category === ('Desktop App' as unknown as ProductCategory)
+        ).slice(0, 3));
+
       } catch (error) {
         console.error("Error fetching home data:", error);
       } finally {
@@ -77,25 +90,15 @@ const HomeContent: React.FC = () => {
       
       {/* --- HERO SECTION --- */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-black">
-        
-        {/* Backgrounds */}
         <div className="absolute inset-0 z-0">
-          {/* Light Mode Gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-white dark:hidden"></div>
-          {/* Dark Mode Gradient */}
           <div className="absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-900/20 via-black to-black"></div>
-          
-          {/* Animated Blob */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-600/10 rounded-full blur-[100px] animate-pulse"></div>
-          
-          {/* Grid Pattern */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
         </div>
 
         <div className="relative z-10 container mx-auto px-4 text-center">
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex flex-col items-center">
-            
-            {/* Logo Placeholder / Brand */}
             <motion.div variants={fadeInUp} className="mb-8 relative group">
                 <div className="absolute -inset-4 bg-rose-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white dark:border-rose-500/50 flex items-center justify-center bg-white dark:bg-black shadow-2xl dark:shadow-[0_0_30px_rgba(225,29,72,0.3)]">
@@ -119,7 +122,7 @@ const HomeContent: React.FC = () => {
               <Link href="/shop" className="px-8 py-4 bg-rose-600 text-white font-bold rounded-full hover:bg-rose-700 transition-all hover:scale-105 shadow-lg shadow-rose-500/20">
                   Browse Catalog
               </Link>
-              <Link href="https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk" className="px-8 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors">
+              <Link href="https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk" target="_blank" className="px-8 py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors">
                 A.S STUDIO YouTube
               </Link>
             </motion.div>
@@ -130,9 +133,10 @@ const HomeContent: React.FC = () => {
       {/* --- CATEGORIES GRID --- */}
       <section className="py-20 bg-white dark:bg-black border-b border-gray-100 dark:border-zinc-900">
          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
                 { label: 'VST Plugins', icon: Cpu, color: 'text-rose-500', href: ProductCategory.VST_PLUGIN },
+                { label: 'Desktop Apps', icon: Monitor, color: 'text-indigo-500', href: 'DESKTOP_APP' },
                 { label: 'Mobile Apps', icon: Smartphone, color: 'text-blue-500', href: ProductCategory.MOBILE_APP },
                 { label: 'Sample Packs', icon: Layers, color: 'text-orange-500', href: ProductCategory.SAMPLE_PACK },
                 { label: 'Presets', icon: Sliders, color: 'text-purple-500', href: ProductCategory.PRESET_PACK },
@@ -168,8 +172,23 @@ const HomeContent: React.FC = () => {
         </div>
       </section>
 
-      {/* --- PRESETS SECTION (New) --- */}
-      <section className="py-24 bg-white dark:bg-black border-y border-gray-100 dark:border-zinc-900">
+      {/* --- DESKTOP APPS SECTION (NEW) --- */}
+      <section className="py-24 bg-white dark:bg-black border-t border-gray-100 dark:border-zinc-900">
+        <div className="container mx-auto px-4">
+          <SectionHeader title="Desktop Software" subtitle="Powerful standalone applications for Mac & Windows" link={`/shop?category=DESKTOP_APP`} />
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+             {desktopApps.length > 0 ? desktopApps.map((app) => (
+                <ProductCard key={app.id} product={app} />
+             )) : (
+                <EmptyState label="Desktop software" />
+             )}
+          </div>
+        </div>
+      </section>
+
+      {/* --- PRESETS SECTION --- */}
+      <section className="py-24 bg-gray-50 dark:bg-zinc-950 border-t border-gray-100 dark:border-zinc-900">
          <div className="container mx-auto px-4">
             <SectionHeader title="Premium Presets" subtitle="Sound design for Serum, Vital & more" link={`/shop?category=${ProductCategory.PRESET_PACK}`} />
             
@@ -187,7 +206,6 @@ const HomeContent: React.FC = () => {
                          ) : (
                            <div className="w-full h-full flex items-center justify-center"><Sliders className="opacity-20" /></div>
                          )}
-                         {/* Overlay on hover */}
                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
                             <h4 className="font-bold text-white mb-1">{pack.name}</h4>
                             <span className="text-rose-500 font-mono text-sm">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</span>
@@ -201,7 +219,6 @@ const HomeContent: React.FC = () => {
 
       {/* --- PLUGINS SECTION --- */}
       <section className="py-24 bg-gray-900 dark:bg-zinc-950 text-white relative overflow-hidden">
-         {/* Decorative Background */}
          <div className="absolute top-0 right-0 w-1/2 h-full bg-rose-900/10 blur-3xl"></div>
 
          <div className="container mx-auto px-4 relative z-10">
@@ -242,13 +259,41 @@ const HomeContent: React.FC = () => {
                      </Link>
                   </motion.div>
                ))}
-               {latestPlugins.length === 0 && <EmptyState label="Plugins" />}
+               {latestPlugins.length === 0 && <div className="col-span-full"><EmptyState label="Plugins" /></div>}
             </div>
          </div>
       </section>
 
-      {/* --- SAMPLE PACKS SECTION (New) --- */}
-      <section className="py-24 bg-white dark:bg-black">
+      {/* --- MOBILE APPS SECTION (NEW) --- */}
+      <section className="py-24 bg-white dark:bg-black border-t border-gray-100 dark:border-zinc-900">
+         <div className="container mx-auto px-4">
+            <SectionHeader title="Mobile Apps" subtitle="Create and produce on the go (iOS & Android)" link={`/shop?category=${ProductCategory.MOBILE_APP}`} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+               {mobileApps.length > 0 ? mobileApps.map((app, idx) => (
+                  <Link key={app.id} href={`/product/${app.id}`}>
+                    <motion.div 
+                       initial={{ opacity: 0, y: 20 }}
+                       whileInView={{ opacity: 1, y: 0 }}
+                       transition={{ delay: idx * 0.1 }}
+                       className="group flex flex-col items-center text-center p-6 rounded-3xl bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all hover:shadow-xl hover:shadow-blue-500/5"
+                    >
+                       <div className="w-24 h-24 mb-4 bg-white dark:bg-zinc-800 rounded-2xl overflow-hidden shadow-sm group-hover:scale-105 transition-transform">
+                          {app.image ? <img src={app.image} className="w-full h-full object-cover" /> : <Smartphone className="w-full h-full p-6 text-gray-300 dark:text-zinc-700" />}
+                       </div>
+                       <h4 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors line-clamp-1">{app.name}</h4>
+                       <div className="mt-2 text-sm font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 py-1 px-3 rounded-full">
+                          {app.price === 0 ? 'FREE' : `₦${app.price}`}
+                       </div>
+                    </motion.div>
+                  </Link>
+               )) : <div className="col-span-full"><EmptyState label="Mobile apps" /></div>}
+            </div>
+         </div>
+      </section>
+
+      {/* --- SAMPLE PACKS SECTION --- */}
+      <section className="py-24 bg-gray-50 dark:bg-zinc-950 border-t border-gray-100 dark:border-zinc-900">
          <div className="container mx-auto px-4">
             <SectionHeader title="Fresh Samples" subtitle="Royalty-free loops and one-shots" link={`/shop?category=${ProductCategory.SAMPLE_PACK}`} />
 
@@ -259,9 +304,9 @@ const HomeContent: React.FC = () => {
                      initial={{ opacity: 0, x: -20 }}
                      whileInView={{ opacity: 1, x: 0 }}
                      transition={{ delay: idx * 0.1 }}
-                     className="group flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 hover:border-rose-500/30 transition-all"
+                     className="group flex items-center gap-4 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 hover:border-rose-500/30 transition-all shadow-sm"
                   >
-                     <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-800 rounded-lg overflow-hidden shrink-0">
+                     <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-lg overflow-hidden shrink-0">
                         {pack.image ? <img src={pack.image} className="w-full h-full object-cover" /> : <Layers className="w-full h-full p-6 opacity-20" />}
                      </div>
                      <div className="flex-1">
@@ -279,7 +324,7 @@ const HomeContent: React.FC = () => {
       </section>
 
       {/* --- NEWSLETTER --- */}
-      <section className="py-24 bg-gray-50 dark:bg-zinc-950 border-t border-gray-200 dark:border-zinc-900 text-center">
+      <section className="py-24 bg-white dark:bg-black border-t border-gray-100 dark:border-zinc-900 text-center">
          <div className="container mx-auto px-4 max-w-2xl">
             <div className="inline-flex items-center justify-center p-4 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-500 rounded-full mb-6">
                <Music className="w-6 h-6" />
@@ -294,7 +339,7 @@ const HomeContent: React.FC = () => {
                <input 
                  type="email" 
                  placeholder="Enter your email address" 
-                 className="flex-1 px-6 py-4 bg-white dark:bg-black border border-gray-200 dark:border-zinc-800 rounded-lg focus:border-rose-500 focus:outline-none text-gray-900 dark:text-white"
+                 className="flex-1 px-6 py-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg focus:border-rose-500 focus:outline-none text-gray-900 dark:text-white"
                />
                <button className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black font-bold rounded-lg hover:bg-rose-600 dark:hover:bg-rose-500 hover:text-white transition-all">
                   Subscribe
@@ -328,7 +373,6 @@ const ProductCard = ({ product }: { product: Product }) => (
       whileHover={{ y: -5 }}
       className="group relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:shadow-xl hover:shadow-rose-500/10 dark:hover:shadow-rose-900/20 transition-all flex flex-col"
     >
-       {/* Image Area */}
        <div className="relative aspect-[4/3] bg-gray-100 dark:bg-zinc-800 overflow-hidden">
          {product.image ? (
             <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -342,7 +386,6 @@ const ProductCard = ({ product }: { product: Product }) => (
          </div>
        </div>
 
-       {/* Content Area */}
        <div className="p-5 flex flex-col flex-1">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-1">{product.name}</h3>
           
@@ -360,7 +403,7 @@ const ProductCard = ({ product }: { product: Product }) => (
 );
 
 const EmptyState = ({ label }: { label: string }) => (
-   <div className="col-span-full py-12 flex flex-col items-center justify-center text-gray-400 border border-dashed border-gray-200 dark:border-zinc-800 rounded-xl bg-gray-50 dark:bg-zinc-900/50">
+   <div className="w-full py-12 flex flex-col items-center justify-center text-gray-400 border border-dashed border-gray-200 dark:border-zinc-800 rounded-xl bg-gray-50 dark:bg-zinc-900/50">
       <Activity className="w-10 h-10 mb-3 opacity-50" />
       <p>No {label} available yet.</p>
    </div>
