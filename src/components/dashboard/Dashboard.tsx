@@ -7,11 +7,10 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2, LucideIcon, HeartOff 
+  User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
-// UPDATED: Replaced arrayRemove with deleteDoc for subcollection removal
 import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -61,6 +60,11 @@ const UserDashboardContent: React.FC = () => {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [displayName, setDisplayName] = useState(user?.name || '');
 
+  // --- NEW: Balance & Verification States ---
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [isVerified, setIsVerified] = useState<boolean>(false);
+  const [fundAmount, setFundAmount] = useState<string>('');
+
   // Crop State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
@@ -77,7 +81,61 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
-  // --- 1. UPDATED: Fetch Favorites from Subcollection Real-time ---
+  // --- NEW: Initialize and Listen to User Profile Data (Balance & Verified) ---
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const userDocRef = doc(db, 'users', user.id);
+    
+    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        let needsUpdate = false;
+        const updates: any = {};
+
+        // Check if fields exist, if not, prepare to create/initialize them
+        if (data.balance === undefined) {
+          updates.balance = 0;
+          needsUpdate = true;
+        }
+        if (data.isVerified === undefined) {
+          updates.isVerified = false;
+          needsUpdate = true;
+        }
+
+        // If they were missing, update the database document
+        if (needsUpdate) {
+          await updateDoc(userDocRef, updates);
+          setUserBalance(updates.balance || 0);
+          setIsVerified(updates.isVerified || false);
+        } else {
+          // Otherwise just sync the local state with database
+          setUserBalance(data.balance);
+          setIsVerified(data.isVerified);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // --- NEW: Handle WhatsApp Funding ---
+  const handleFundWhatsApp = () => {
+    if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    
+    // WhatsApp format string. 07056131455 -> +2347056131455
+    const phoneNumber = "2347056131455"; 
+    const message = `Hello, I want to fund my account with ₦${fundAmount}.\n\n*Account Details:*\nEmail: ${user?.email}\nName: ${user?.name}`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+    setFundAmount(''); // clear input after opening
+  };
+
+  // --- Fetch Favorites ---
   useEffect(() => {
     if (!user?.id) return;
     setLoadingFavorites(true);
@@ -85,7 +143,6 @@ const UserDashboardContent: React.FC = () => {
     const favColRef = collection(db, "users", user.id, "favorites");
     
     const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
-        // Map document IDs from the subcollection
         const favoriteIds = snapshot.docs.map(doc => doc.id);
 
         if (favoriteIds.length === 0) {
@@ -95,7 +152,6 @@ const UserDashboardContent: React.FC = () => {
         }
 
         try {
-            // Resolve all IDs to full product objects
             const favDetails = await Promise.all(
                 favoriteIds.map(async (prodId: string) => {
                     const productSnap = await getDoc(doc(db, 'products', prodId));
@@ -123,7 +179,7 @@ const UserDashboardContent: React.FC = () => {
     return () => unsubscribe();
   }, [user?.id]);
 
-  // --- 2. Fetch Raw Orders Snapshot ---
+  // --- Fetch Raw Orders Snapshot ---
   useEffect(() => {
     if (!user) return;
     setLoadingOrders(true);
@@ -156,7 +212,7 @@ const UserDashboardContent: React.FC = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // --- 3. Enrich Orders with Live Product Data ---
+  // --- Enrich Orders ---
   useEffect(() => {
     const enrichOrders = async () => {
         if (rawOrders.length === 0) return;
@@ -216,7 +272,6 @@ const UserDashboardContent: React.FC = () => {
     enrichOrders();
   }, [rawOrders]);
 
-  // --- UPDATED: Handle Unfavorite via Subcollection ---
   const handleRemoveFavorite = async (productId: string) => {
     if (!user) return;
     try {
@@ -411,20 +466,50 @@ const UserDashboardContent: React.FC = () => {
               </div>
               
               <div className="text-center space-y-1">
-                <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{user?.name || "Guest User"}</h1>
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight flex justify-center items-center gap-2 text-gray-900 dark:text-white">
+                  {user?.name || "Guest User"}
+                  {/* --- NEW: Verified Badge UI --- */}
+                  {isVerified ? (
+                    <BadgeCheck className="w-7 h-7 text-blue-500 shrink-0 mt-1" title="Verified Account" />
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-widest font-bold bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 px-2 py-1 rounded-full mb-1 ml-2">Unverified</span>
+                  )}
+                </h1>
                 <p className="text-gray-500 font-medium">{user?.email}</p>
               </div>
 
-              <div className="flex gap-4 justify-center w-full max-w-lg mx-auto">
-                <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
-                    <div className="font-black text-2xl text-gray-900 dark:text-white">{orders.length}</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
+              <div className="flex flex-col gap-4 w-full max-w-2xl mx-auto">
+                <div className="flex gap-4 justify-center w-full">
+                  <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
+                      <div className="font-black text-2xl text-gray-900 dark:text-white">{orders.length}</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
+                  </div>
+                  
+                  {/* --- NEW: Naira Balance UI --- */}
+                  <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
+                      <div className="font-black text-2xl text-green-600">₦{userBalance.toLocaleString()}</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Wallet Balance</div>
+                  </div>
                 </div>
-                <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
-                    <div className="font-black text-2xl text-rose-600">Free</div>
-                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Plan</div>
+
+                {/* --- NEW: Add Balance Form with WhatsApp --- */}
+                <div className="flex flex-col sm:flex-row items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
+                    <input
+                      type="number"
+                      placeholder="Enter amount to fund (₦)"
+                      value={fundAmount}
+                      onChange={(e) => setFundAmount(e.target.value)}
+                      className="w-full sm:flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 outline-none focus:border-green-500 transition-colors"
+                    />
+                    <button
+                      onClick={handleFundWhatsApp}
+                      className="w-full sm:w-auto px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-md shadow-green-600/20 whitespace-nowrap"
+                    >
+                      Fund via WhatsApp
+                    </button>
                 </div>
               </div>
+
           </div>
         </motion.div>
 
@@ -533,7 +618,6 @@ const UserDashboardContent: React.FC = () => {
                   </div>
                 )}
 
-                {/* --- UPDATED FAVORITES TAB --- */}
                 {activeTab === 'Favorites' && (
                     <div>
                         {loadingFavorites ? (
@@ -643,6 +727,3 @@ const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, text, actionText })
 );
 
 export default UserDashboardContent;
-
-
-
