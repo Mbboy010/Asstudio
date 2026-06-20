@@ -470,12 +470,15 @@ const UserDashboardContent: React.FC = () => {
               <div className="text-center space-y-1">
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight flex justify-center items-center gap-2 text-gray-900 dark:text-white">
                   {user?.name || "Guest User"}
-                  {/* --- Verified Badge UI --- */}
-                  {isVerified ? (
-                    <BadgeCheck className="w-7 h-7 text-blue-500 shrink-0 mt-1" title="Verified Account" />
-                  ) : (
-                    <span className="text-[10px] uppercase tracking-widest font-bold bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 px-2 py-1 rounded-full mb-1 ml-2">Unverified</span>
-                  )}
+                      {/* --- Verified Badge UI --- */}
+                      {isVerified ? (
+                        <span title="Verified Account" className="flex shrink-0 mt-1">
+                          <BadgeCheck className="w-7 h-7 text-blue-500" />
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase tracking-widest font-bold bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 px-2 py-1 rounded-full mb-1 ml-2">Unverified</span>
+                      )}
+
                 </h1>
                 <p className="text-gray-500 font-medium">{user?.email}</p>
               </div>
