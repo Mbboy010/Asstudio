@@ -7,7 +7,7 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck, XCircle
+  User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
@@ -60,7 +60,7 @@ const UserDashboardContent: React.FC = () => {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [displayName, setDisplayName] = useState(user?.name || '');
 
-  // --- NEW: Balance & Verification States ---
+  // --- Balance & Verification States ---
   const [userBalance, setUserBalance] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [fundAmount, setFundAmount] = useState<string>('');
@@ -81,7 +81,7 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
-  // --- NEW: Initialize and Listen to User Profile Data (Balance & Verified) ---
+  // --- Initialize and Listen to User Profile Data (Balance & Verified) ---
   useEffect(() => {
     if (!user?.id) return;
     
@@ -91,7 +91,9 @@ const UserDashboardContent: React.FC = () => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         let needsUpdate = false;
-        const updates: any = {};
+        
+        // FIX: Replaced 'any' with a strict TypeScript interface
+        const updates: { balance?: number; isVerified?: boolean } = {};
 
         // Check if fields exist, if not, prepare to create/initialize them
         if (data.balance === undefined) {
@@ -119,7 +121,7 @@ const UserDashboardContent: React.FC = () => {
     return () => unsubscribe();
   }, [user?.id]);
 
-  // --- NEW: Handle WhatsApp Funding ---
+  // --- Handle WhatsApp Funding ---
   const handleFundWhatsApp = () => {
     if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
       alert("Please enter a valid amount.");
@@ -468,7 +470,7 @@ const UserDashboardContent: React.FC = () => {
               <div className="text-center space-y-1">
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight flex justify-center items-center gap-2 text-gray-900 dark:text-white">
                   {user?.name || "Guest User"}
-                  {/* --- NEW: Verified Badge UI --- */}
+                  {/* --- Verified Badge UI --- */}
                   {isVerified ? (
                     <BadgeCheck className="w-7 h-7 text-blue-500 shrink-0 mt-1" title="Verified Account" />
                   ) : (
@@ -485,14 +487,14 @@ const UserDashboardContent: React.FC = () => {
                       <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
                   </div>
                   
-                  {/* --- NEW: Naira Balance UI --- */}
+                  {/* --- Naira Balance UI --- */}
                   <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
                       <div className="font-black text-2xl text-green-600">₦{userBalance.toLocaleString()}</div>
                       <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Wallet Balance</div>
                   </div>
                 </div>
 
-                {/* --- NEW: Add Balance Form with WhatsApp --- */}
+                {/* --- Add Balance Form with WhatsApp --- */}
                 <div className="flex flex-col sm:flex-row items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
                     <input
                       type="number"
