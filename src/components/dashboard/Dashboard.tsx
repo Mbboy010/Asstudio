@@ -7,12 +7,13 @@ import { RootState, updateProfile } from '@/store';
 import { 
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
-  User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck
+  User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck,
+  Wallet, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db, auth } from '@/firebase'; // Added auth import for verification checking
 
 const CROP_SIZE = 280;
 
@@ -64,6 +65,7 @@ const UserDashboardContent: React.FC = () => {
   const [userBalance, setUserBalance] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [fundAmount, setFundAmount] = useState<string>('');
+  const [isFundModalOpen, setIsFundModalOpen] = useState<boolean>(false);
 
   // Crop State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +83,7 @@ const UserDashboardContent: React.FC = () => {
     if (user?.name) setDisplayName(user.name);
   }, [user]);
 
-  // --- Initialize and Listen to User Profile Data (Balance & Verified) ---
+  // --- Initialize and Listen to User Profile Data (Balance & Verified with Check) ---
   useEffect(() => {
     if (!user?.id) return;
     
@@ -92,26 +94,28 @@ const UserDashboardContent: React.FC = () => {
         const data = docSnap.data();
         let needsUpdate = false;
         
-        // FIX: Replaced 'any' with a strict TypeScript interface
         const updates: { balance?: number; isVerified?: boolean } = {};
 
-        // Check if fields exist, if not, prepare to create/initialize them
+        // 1. Core verification check against actual Firebase Auth baseline profile status
+        const isAuthEmailVerified = auth.currentUser?.emailVerified || false;
+        const currentVerifiedStatus = data.isVerified ?? false;
+
         if (data.balance === undefined) {
           updates.balance = 0;
           needsUpdate = true;
         }
-        if (data.isVerified === undefined) {
-          updates.isVerified = false;
+
+        // Check if database status is unverified but Auth profile says verified
+        if (data.isVerified === undefined || (!currentVerifiedStatus && isAuthEmailVerified)) {
+          updates.isVerified = isAuthEmailVerified;
           needsUpdate = true;
         }
 
-        // If they were missing, update the database document
         if (needsUpdate) {
           await updateDoc(userDocRef, updates);
-          setUserBalance(updates.balance || 0);
-          setIsVerified(updates.isVerified || false);
+          setUserBalance(updates.balance !== undefined ? updates.balance : (data.balance || 0));
+          setIsVerified(updates.isVerified !== undefined ? updates.isVerified : currentVerifiedStatus);
         } else {
-          // Otherwise just sync the local state with database
           setUserBalance(data.balance);
           setIsVerified(data.isVerified);
         }
@@ -128,13 +132,13 @@ const UserDashboardContent: React.FC = () => {
       return;
     }
     
-    // WhatsApp format string. 07056131455 -> +2347056131455
     const phoneNumber = "2347056131455"; 
-    const message = `Hello, I want to fund my account with ₦${fundAmount}.\n\n*Account Details:*\nEmail: ${user?.email}\nName: ${user?.name}`;
+    const message = `Hello, I want to fund my account with ₦${Number(fundAmount).toLocaleString()}.\n\n*Account Details:*\nUser ID: ${user?.id}\nEmail: ${user?.email}\nName: ${user?.name}`;
     const encodedMessage = encodeURIComponent(message);
     
     window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
-    setFundAmount(''); // clear input after opening
+    setFundAmount(''); 
+    setIsFundModalOpen(false); // close custom modal
   };
 
   // --- Fetch Favorites ---
@@ -497,20 +501,14 @@ const UserDashboardContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* --- Add Balance Form with WhatsApp --- */}
-                <div className="flex flex-col sm:flex-row items-center gap-3 p-2 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
-                    <input
-                      type="number"
-                      placeholder="Enter amount to fund (₦)"
-                      value={fundAmount}
-                      onChange={(e) => setFundAmount(e.target.value)}
-                      className="w-full sm:flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 outline-none focus:border-green-500 transition-colors"
-                    />
+                {/* --- Replaced Input block with simple Add Money Action Button --- */}
+                <div className="w-full flex justify-center mt-1">
                     <button
-                      onClick={handleFundWhatsApp}
-                      className="w-full sm:w-auto px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-md shadow-green-600/20 whitespace-nowrap"
+                      onClick={() => setIsFundModalOpen(true)}
+                      className="w-full px-8 py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
                     >
-                      Fund via WhatsApp
+                      <Wallet className="w-5 h-5" />
+                      Add Money
                     </button>
                 </div>
               </div>
@@ -689,6 +687,75 @@ const UserDashboardContent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* --- Custom Modal Alert to Display How To Add Money --- */}
+      <AnimatePresence>
+        {isFundModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }} 
+              className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-6 w-full max-w-md border border-gray-200 dark:border-zinc-800"
+            >
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-black flex items-center gap-2 text-gray-900 dark:text-white">
+                    <Wallet className="w-5 h-5 text-green-600" /> 
+                    Fund Account Balance
+                  </h3>
+                  <button 
+                    onClick={() => { setIsFundModalOpen(false); setFundAmount(''); }} 
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+              </div>
+
+              {/* Instruction Panel */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 rounded-xl mb-5 flex gap-3 text-sm text-blue-700 dark:text-blue-400">
+                <Info className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block mb-1">Payment Instructions:</span>
+                  To top up your wallet balance, fill in your desired top-up amount below and click the verification button. It will open a direct line to our support desk on WhatsApp to securely credit your profile.
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Amount to Add</label>
+                    <input
+                      type="number"
+                      placeholder="Enter amount to fund (₦)"
+                      value={fundAmount}
+                      onChange={(e) => setFundAmount(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 outline-none focus:border-green-500 text-gray-900 dark:text-white transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                      <button 
+                        onClick={() => { setIsFundModalOpen(false); setFundAmount(''); }} 
+                        className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleFundWhatsApp} 
+                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-600/10"
+                      >
+                        Send via WhatsApp
+                      </button>
+                  </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
