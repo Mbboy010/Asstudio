@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import SignupView from '@/components/views/auth/SignupView';
 
 export const metadata: Metadata = {
-  title: "Signup | Asstudio",
+  title: "Signup | register",
   description: "Create an account to join the community.",
 };
 

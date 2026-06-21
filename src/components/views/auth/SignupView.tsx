@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { User, Mail, Phone, FileText, Lock, Eye, EyeOff, Loader, ArrowRight } from 'lucide-react';
+import { User, Mail, Phone, Lock, Eye, EyeOff, Loader, ArrowRight } from 'lucide-react';
 import { auth, db } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -22,7 +21,6 @@ const SignupView: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [bio, setBio] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   
@@ -51,19 +49,20 @@ const SignupView: React.FC = () => {
 
       const role = email === 'admin@asstudio.com' ? 'admin' : 'user';
 
+      // Added balance: 600 for new email registrations
       await setDoc(doc(db, "users", user.uid), {
         id: user.uid,
         name: name,
         email: email,
         phone: phone,
-        bio: bio,
         role: role,
+        balance: 600, 
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
         joinedAt: new Date().toISOString()
       });
 
       window.location.href = '/dashboard';
-    } catch (err: unknown) { // Changed 'any' to 'unknown'
+    } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       let msg = firebaseError.message.replace('Firebase: ', '');
       if (msg.includes('email-already-in-use')) msg = 'This email is already registered.';
@@ -85,6 +84,7 @@ const SignupView: React.FC = () => {
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
+      // Added balance: 600 for new Google registrations
       if (!docSnap.exists()) {
         const isDevAdmin = user.email === 'admin@asstudio.com';
         await setDoc(doc(db, "users", user.uid), {
@@ -92,15 +92,15 @@ const SignupView: React.FC = () => {
             name: user.displayName || 'User',
             email: user.email,
             phone: '',
-            bio: '',
             role: isDevAdmin ? 'admin' : 'user',
+            balance: 600,
             avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
             joinedAt: new Date().toISOString()
         });
       }
 
       router.push('/dashboard');
-    } catch (err: unknown) { // Changed 'any' to 'unknown'
+    } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       setError(firebaseError.message.replace('Firebase: ', ''));
     } finally {
@@ -154,37 +154,20 @@ const SignupView: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Phone (Optional)</label>
-              <div className="relative group">
-                 <div className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-rose-600 transition-colors">
-                    <Phone className="w-5 h-5" />
-                 </div>
-                <input 
-                  type="tel" 
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="+234..."
-                  className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-3.5 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-600" 
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Role (Optional)</label>
-              <div className="relative group">
-                 <div className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-rose-600 transition-colors">
-                    <FileText className="w-5 h-5" />
-                 </div>
-                <input 
-                  type="text" 
-                  value={bio}
-                  onChange={e => setBio(e.target.value)}
-                  placeholder="Producer..."
-                  className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-3.5 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-600" 
-                />
-              </div>
-            </div>
+        <div>
+          <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Phone (Optional)</label>
+          <div className="relative group">
+             <div className="absolute left-3 top-3.5 text-gray-400 group-focus-within:text-rose-600 transition-colors">
+                <Phone className="w-5 h-5" />
+             </div>
+            <input 
+              type="tel" 
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+234..."
+              className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-3.5 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-600" 
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
