@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, Info, X } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -73,6 +73,18 @@ const ProductDetail: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // --- Custom Alert State ---
+  const [alertConfig, setAlertConfig] = useState({ 
+    show: false, 
+    message: '', 
+    type: 'success' as 'success' | 'error' | 'info' 
+  });
+
+  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertConfig({ show: true, message, type });
+    
+  };
 
   // --- Auth Listener ---
   useEffect(() => {
@@ -197,7 +209,12 @@ const ProductDetail: React.FC = () => {
     }
     await user.reload();
     if (!user.emailVerified) {
-      try { await sendEmailVerification(user); alert("Please verify your email first."); } catch (e) {}
+      try { 
+        await sendEmailVerification(user); 
+        showAlert("Please verify your email first. A new link has been sent.", "error"); 
+      } catch (e) {
+        showAlert("Failed to send verification email.", "error");
+      }
       return false;
     }
     return true;
@@ -209,8 +226,11 @@ const ProductDetail: React.FC = () => {
       try {
         const cartItemRef = doc(db, "users", currentUser.id, "cart", selectedProduct.id);
         await setDoc(cartItemRef, { ...selectedProduct, addedAt: new Date().toISOString(), quantity: 1 });
-        alert("Added to cart!");
-      } catch (e) { console.error(e); }
+        showAlert("Added to cart successfully!", "success");
+      } catch (e) { 
+        console.error(e); 
+        showAlert("Failed to add to cart.", "error");
+      }
     }
   };
 
@@ -253,11 +273,11 @@ const ProductDetail: React.FC = () => {
       
     } catch (error) {
       console.error("Download action failed:", error);
+      showAlert("Failed to initiate download.", "error");
     } finally {
       setIsDownloading(false);
     }
   };
-
 
   const handleShare = async () => {
     try { 
@@ -265,6 +285,7 @@ const ProductDetail: React.FC = () => {
     } catch (e) {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true); 
+      showAlert("Link copied to clipboard!", "success");
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -285,6 +306,9 @@ const ProductDetail: React.FC = () => {
         likes: 0
       });
       setNewReview('');
+      showAlert("Review submitted successfully!", "success");
+    } catch (error) {
+      showAlert("Failed to submit review.", "error");
     } finally { setIsSubmittingReview(false); }
   };
 
@@ -306,18 +330,28 @@ const ProductDetail: React.FC = () => {
 
   const handleDeleteReview = async (reviewId: string) => {
     if (window.confirm('Are you sure you want to delete this review?')) {
-      await deleteDoc(doc(db, "products", id, "reviews", reviewId));
+      try {
+        await deleteDoc(doc(db, "products", id, "reviews", reviewId));
+        showAlert("Review deleted.", "success");
+      } catch (error) {
+        showAlert("Failed to delete review.", "error");
+      }
     }
   };
 
   const handleUpdateReview = async (reviewId: string, content: string) => {
-    await updateDoc(doc(db, "products", id, "reviews", reviewId), { content });
+    try {
+      await updateDoc(doc(db, "products", id, "reviews", reviewId), { content });
+      showAlert("Review updated.", "success");
+    } catch (error) {
+      showAlert("Failed to update review.", "error");
+    }
   };
 
   if (loading || !product) return <DetailSkeleton />;
 
   return (
-    <div className="min-h-screen py-12 px-4 max-w-7xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white transition-colors">
+    <div className="min-h-screen py-12 px-4 max-w-7xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white transition-colors relative">
       
       <LightboxModal 
         url={selectedScreenshot} 
@@ -372,6 +406,70 @@ const ProductDetail: React.FC = () => {
         onUpdate={handleUpdateReview}
         onLoginRedirect={() => router.push('/login')}
       />
+
+      {/* --- Centered Modal Alert --- */}
+      <AnimatePresence>
+        {alertConfig.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
+            />
+            
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm flex flex-col items-center text-center gap-3 p-8 rounded-3xl shadow-2xl border bg-white dark:bg-zinc-900 border-gray-100 dark:border-zinc-800"
+            >
+              {/* Close Button (Top Right) */}
+              <button 
+                onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))} 
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Centered Icon */}
+              <div className={`p-4 rounded-full mb-2 ${
+                alertConfig.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                alertConfig.type === 'error' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+              }`}>
+                {alertConfig.type === 'success' && <CheckCircle className="w-10 h-10" />}
+                {alertConfig.type === 'error' && <AlertCircle className="w-10 h-10" />}
+                {alertConfig.type === 'info' && <Info className="w-10 h-10" />}
+              </div>
+              
+              {/* Text Content */}
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {alertConfig.type === 'success' ? 'Success!' : alertConfig.type === 'error' ? 'Oops!' : 'Notice'}
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                {alertConfig.message}
+              </p>
+              
+              {/* Action Button */}
+              <button 
+                onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
+                className={`w-full py-3 rounded-xl font-semibold transition-colors ${
+                   alertConfig.type === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                   alertConfig.type === 'error' ? 'bg-red-600 hover:bg-red-700 text-white' :
+                   'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                Okay
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

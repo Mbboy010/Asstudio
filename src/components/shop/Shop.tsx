@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react'; 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter, CheckCircle, XCircle } from 'lucide-react';
+import { Search, ShoppingCart, Eye, ChevronLeft, ChevronRight, Cpu, Star, Download, RefreshCcw, Image as ImageIcon, Loader, Filter, CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 import { Product, ProductCategory } from '@/types';
 import { ProductSkeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
-import Image from 'next/image'; // 1. Added Next.js Image component
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
@@ -14,8 +14,6 @@ import { sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
 
 const ITEMS_PER_PAGE = 12;
 
-// 2. Define an interface for Product that includes optional download URLs 
-// to avoid using 'any'
 interface DownloadableProduct extends Product {
   demoUrl?: string;
   productUrl?: string;
@@ -25,8 +23,18 @@ const ShopContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Removed unused 'user' state to clear linting warning
-  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  // --- Custom Alert State ---
+  const [alertConfig, setAlertConfig] = useState({ 
+    show: false, 
+    message: '', 
+    type: 'success' as 'success' | 'error' | 'info' 
+  });
+
+  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertConfig({ show: true, message, type });
+    
+  };
+
   const [loading, setLoading] = useState(true);
   const selectedCategory = searchParams?.get('category') ?? 'All';
   const urlSearchTerm = searchParams?.get('search') ?? '';
@@ -36,18 +44,13 @@ const ShopContent: React.FC = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Auth Listener (Simplified)
+  // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, () => {
       // Logic for user state if needed later
     });
     return () => unsubscribe();
   }, []);
-
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
-  };
 
   useEffect(() => {
     setLocalSearchTerm(urlSearchTerm);
@@ -80,7 +83,7 @@ const ShopContent: React.FC = () => {
       setProducts(fetchedProducts);
     } catch (error: unknown) {
       console.error("Error fetching products: ", error);
-      showNotification('error', "Failed to load products.");
+      showAlert("Failed to load products.", "error");
     } finally {
       setLoading(false);
     }
@@ -101,13 +104,13 @@ const ShopContent: React.FC = () => {
     if (!currentUser.emailVerified) {
         try {
             await sendEmailVerification(currentUser);
-            showNotification('error', `Account not verified. Link sent to ${currentUser.email}.`);
+            showAlert(`Account not verified. Link sent to ${currentUser.email}.`, "error");
           } catch (error: unknown) {
-                const firebaseError = error as { code?: string }; // Cast the type here instead
+                const firebaseError = error as { code?: string }; 
                 if (firebaseError.code === 'auth/too-many-requests') {
-                    showNotification('error', "Verification email already sent.");
+                    showAlert("Verification email already sent.", "error");
                 } else {
-                    showNotification('error', "Verification failed.");
+                    showAlert("Verification failed.", "error");
                 }
           }
 
@@ -128,10 +131,10 @@ const ShopContent: React.FC = () => {
                 quantity: 1,
                 addedAt: new Date().toISOString()
             });
-            showNotification('success', `${product.name} added to cart!`);
+            showAlert(`${product.name} added to cart!`, "success");
           } catch (error) {
             console.error("Add to cart failed:", error);
-            showNotification('error', "Failed to add item to cart.");
+            showAlert("Failed to add item to cart.", "error");
           }
       }
   };
@@ -165,19 +168,18 @@ const ShopContent: React.FC = () => {
         }
       }
 
-      // 3. FIXED: Cast to DownloadableProduct instead of 'any'
       const p = product as DownloadableProduct;
       if (isDemo && p?.demoUrl) {
         window.open(p.demoUrl, '_blank');
       } else if (!isDemo && p?.productUrl) {
         window.open(p.productUrl, '_blank');
       } else {
-        showNotification('error', "Download link missing.");
+        showAlert("Download link missing.", "error");
       }
       
     } catch (error) {
       console.error("Download action failed:", error);
-      showNotification('error', "Download failed.");
+      showAlert("Download failed.", "error");
     } finally {
       setDownloadingId(null);
     }
@@ -222,22 +224,6 @@ const ShopContent: React.FC = () => {
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50 dark:bg-black transition-colors duration-300 relative">
       
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold ${
-              notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-            }`}
-          >
-            {notification.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <XCircle className="w-5 h-5"/>}
-            {notification.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <motion.div 
          initial={{ opacity: 0, y: -20 }}
          whileInView={{ opacity: 1, y: 0 }}
@@ -294,7 +280,6 @@ const ShopContent: React.FC = () => {
             >
               <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
                 {product.image ? (
-                   // 4. FIXED: Replaced <img> with optimized <Image />
                    <img 
                     src={product.image} 
                     alt={product.name}
@@ -414,6 +399,70 @@ const ShopContent: React.FC = () => {
             </button>
         </div>
       )}
+
+      {/* --- Centered Modal Alert --- */}
+      <AnimatePresence>
+        {alertConfig.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            {/* Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
+            />
+            
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm flex flex-col items-center text-center gap-3 p-8 rounded-3xl shadow-2xl border bg-white dark:bg-zinc-900 border-gray-100 dark:border-zinc-800"
+            >
+              {/* Close Button (Top Right) */}
+              <button 
+                onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))} 
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Centered Icon */}
+              <div className={`p-4 rounded-full mb-2 ${
+                alertConfig.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                alertConfig.type === 'error' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+              }`}>
+                {alertConfig.type === 'success' && <CheckCircle className="w-10 h-10" />}
+                {alertConfig.type === 'error' && <AlertCircle className="w-10 h-10" />}
+                {alertConfig.type === 'info' && <Info className="w-10 h-10" />}
+              </div>
+              
+              {/* Text Content */}
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {alertConfig.type === 'success' ? 'Success!' : alertConfig.type === 'error' ? 'Oops!' : 'Notice'}
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                {alertConfig.message}
+              </p>
+              
+              {/* Action Button */}
+              <button 
+                onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
+                className={`w-full py-3 rounded-xl font-semibold transition-colors ${
+                   alertConfig.type === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                   alertConfig.type === 'error' ? 'bg-red-600 hover:bg-red-700 text-white' :
+                   'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                Okay
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
