@@ -7,6 +7,7 @@ import { Layout as MainLayout } from "@/components/Layout";
 
 import { AuthProvider } from "./AuthContext";
 import AuthGuard from "./AuthGuard";
+import CookieConsent from "@/components/CookieConsent";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
@@ -61,6 +62,7 @@ export default function RootLayout({
             {/* We wrap the inner content with the existing Layout component for Navbar/Footer */}
             <MainLayout> 
               {children}
+              <CookieConsent />
             </MainLayout>
         </Providers>
           </AuthGuard>

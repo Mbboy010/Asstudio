@@ -160,10 +160,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         return;
       }
 
-      // --- Deduct Balance ---
+      // --- Deduct Balance and Update Total Spent ---
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        balance: increment(-subtotal)
+        balance: increment(-subtotal),
+        totalSpent: increment(subtotal)
       });
 
       // Map to just id and savedAt
@@ -292,7 +293,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             {items.length > 0 && (
               <div className="p-6 border-t dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/50 relative z-10">
                 
-                {/* --- NEW: Available Balance Display --- */}
+                {/* --- Available Balance Display --- */}
                 <div className="flex justify-between items-center mb-3 p-3 bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl">
                   <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                     <Wallet size={16} />
@@ -319,7 +320,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            {/* --- NEW: Custom Alert Overlay --- */}
+            {/* --- Custom Alert Overlay --- */}
             <AnimatePresence>
               {alertConfig.show && (
                 <motion.div

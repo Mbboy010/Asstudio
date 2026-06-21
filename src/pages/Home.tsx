@@ -172,7 +172,7 @@ const HomeContent: React.FC = () => {
         </div>
       </section>
 
-      {/* --- DESKTOP APPS SECTION (NEW) --- */}
+      {/* --- DESKTOP APPS SECTION --- */}
       <section className="py-24 bg-white dark:bg-black border-t border-gray-100 dark:border-zinc-900">
         <div className="container mx-auto px-4">
           <SectionHeader title="Desktop Software" subtitle="Powerful standalone applications for Mac & Windows" link={`/shop?category=DESKTOP_APP`} />
@@ -199,16 +199,18 @@ const HomeContent: React.FC = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.1 }}
-                        className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-zinc-900"
+                        className="group flex flex-col h-full"
                       >
-                         {pack.image ? (
-                           <img src={pack.image} alt={pack.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                         ) : (
-                           <div className="w-full h-full flex items-center justify-center"><Sliders className="opacity-20" /></div>
-                         )}
-                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
-                            <h4 className="font-bold text-white mb-1">{pack.name}</h4>
-                            <span className="text-rose-500 font-mono text-sm">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</span>
+                         <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-zinc-900 mb-3">
+                            {pack.image ? (
+                              <img src={pack.image} alt={pack.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"><Sliders className="opacity-20" /></div>
+                            )}
+                         </div>
+                         <div className="px-1">
+                            <h4 className="font-bold text-gray-900 dark:text-white text-sm md:text-base line-clamp-1 mb-1">{pack.name}</h4>
+                            <span className="text-rose-500 font-mono text-xs md:text-sm font-bold">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</span>
                          </div>
                       </motion.div>
                    </Link>
@@ -250,8 +252,7 @@ const HomeContent: React.FC = () => {
                         <div className="absolute top-2 right-2 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded">VST3</div>
                      </div>
                      <h3 className="text-xl font-bold mb-1">{plugin.name}</h3>
-                     <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-sm">v1.0.0</span>
+                     <div className="flex justify-end items-center">
                         <span className="text-rose-400 font-mono font-bold">{plugin.price === 0 ? 'FREE' : `₦${plugin.price}`}</span>
                      </div>
                      <Link href={`/product/${plugin.id}`} className="mt-4 block w-full py-2 bg-white/10 hover:bg-rose-600 text-center rounded-lg transition-colors text-sm font-bold">
@@ -264,7 +265,7 @@ const HomeContent: React.FC = () => {
          </div>
       </section>
 
-      {/* --- MOBILE APPS SECTION (NEW) --- */}
+      {/* --- MOBILE APPS SECTION --- */}
       <section className="py-24 bg-white dark:bg-black border-t border-gray-100 dark:border-zinc-900">
          <div className="container mx-auto px-4">
             <SectionHeader title="Mobile Apps" subtitle="Create and produce on the go (iOS & Android)" link={`/shop?category=${ProductCategory.MOBILE_APP}`} />
