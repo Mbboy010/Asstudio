@@ -246,7 +246,7 @@ const UserDashboardContent: React.FC = () => {
                         name: productInfo.name || 'Unknown',
                         image: productInfo.image || '',
                         category: productInfo.category || 'N/A',
-                        productUrl: productInfo.demoUrl || productInfo.productUrl,
+                        productUrl: productInfo.productUrl,
                         orderDate: item.savedAt || order.createdAt,
                         isDeleted: false
                     };
