@@ -8,11 +8,11 @@ import {
   Clock, Download, Settings, Box, Package, Camera, Heart, 
   Save, Loader, CheckCircle, ZoomIn, ZoomOut, X, Upload, 
   User, Shield, Trash2, LucideIcon, HeartOff, BadgeCheck,
-  Wallet, Info
+  Wallet, Info, ArrowUpRight, ArrowDownLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
-import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 
 const CROP_SIZE = 280;
@@ -44,21 +44,32 @@ interface RawOrderItem {
     items: { id: string; savedAt: string }[];
 }
 
+interface TransactionItem {
+    id: string;
+    amount: number;
+    type: 'deposit' | 'purchase';
+    description?: string;
+    createdAt: string;
+}
+
 const UserDashboardContent: React.FC = () => {
   const dispatch = useDispatch();
   const { user, loading: authLoading } = useSelector((state: RootState) => state.auth);
   const [activeTab, setActiveTab] = useState('My Library');
+  const [historySubTab, setHistorySubTab] = useState<'orders' | 'transactions'>('orders');
   const [isExpanded, setIsExpanded] = useState(false); // Controls the "See More" 7-item limit
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [rawOrders, setRawOrders] = useState<RawOrderItem[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
   // Favorites States
   const [favoriteItems, setFavoriteItems] = useState<LibraryItem[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
-  
+
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [displayName, setDisplayName] = useState(user?.name || '');
 
@@ -87,14 +98,14 @@ const UserDashboardContent: React.FC = () => {
   // --- Initialize and Listen to User Profile Data (Balance & Verified with Check) ---
   useEffect(() => {
     if (!user?.id) return;
-    
+
     const userDocRef = doc(db, 'users', user.id);
-    
+
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         let needsUpdate = false;
-        
+
         const updates: { balance?: number; isVerified?: boolean } = {};
 
         // 1. Core verification check against actual Firebase Auth baseline profile status
@@ -126,17 +137,40 @@ const UserDashboardContent: React.FC = () => {
     return () => unsubscribe();
   }, [user?.id]);
 
+  // --- Fetch User Transaction Ledger ---
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoadingTransactions(true);
+
+    const transRef = collection(db, 'users', user.id, 'transactions');
+    const q = query(transRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const transList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TransactionItem[];
+      setTransactions(transList);
+      setLoadingTransactions(false);
+    }, (error) => {
+      console.error("Error fetching transactions:", error);
+      setLoadingTransactions(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
   // --- Handle WhatsApp Funding ---
   const handleFundWhatsApp = () => {
     if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
       alert("Please enter a valid amount.");
       return;
     }
-    
+
     const phoneNumber = "2347056131455"; 
     const message = `Hello, I want to fund my account with ₦${Number(fundAmount).toLocaleString()}.\n\n*Account Details:*\nUser ID: ${user?.id}\nEmail: ${user?.email}\nName: ${user?.name}`;
     const encodedMessage = encodeURIComponent(message);
-    
+
     window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
     setFundAmount(''); 
     setIsFundModalOpen(false); // close custom modal
@@ -148,7 +182,7 @@ const UserDashboardContent: React.FC = () => {
     setLoadingFavorites(true);
 
     const favColRef = collection(db, "users", user.id, "favorites");
-    
+
     const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
         // Collect IDs and potential creation dates to allow sorting by date
         const favoriteList = snapshot.docs.map(doc => ({
@@ -200,7 +234,7 @@ const UserDashboardContent: React.FC = () => {
     setLoadingOrders(true);
 
     const q = query(collection(db, "orders"), where("userId", "==", user.id));
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
         try {
             const fetchedOrders = snapshot.docs.map(doc => {
@@ -213,7 +247,7 @@ const UserDashboardContent: React.FC = () => {
                     items: data.items || [] 
                 };
             }) as RawOrderItem[];
-            
+
             // Ensures History tab displays descending by creation date (newest first)
             fetchedOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             setRawOrders(fetchedOrders);
@@ -232,7 +266,7 @@ const UserDashboardContent: React.FC = () => {
   useEffect(() => {
     const enrichOrders = async () => {
         if (rawOrders.length === 0) return;
-        
+
         try {
             const productIds = new Set<string>();
             rawOrders.forEach(order => order.items?.forEach(item => productIds.add(item.id)));
@@ -280,7 +314,7 @@ const UserDashboardContent: React.FC = () => {
 
             // Sort individual library items by order date chronologically (newest first)
             allItems.sort((a, b) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime());
-            
+
             setLibraryItems(allItems);
         } catch (error) {
             console.error("Enrichment error:", error);
@@ -396,7 +430,7 @@ const UserDashboardContent: React.FC = () => {
         const renderedWidth = img.naturalWidth * baseScale * cropZoom;
         const renderedHeight = img.naturalHeight * baseScale * cropZoom;
         ctx.drawImage(img, cropOffset.x, cropOffset.y, renderedWidth, renderedHeight);
-        
+
         let quality = 0.9;
         let dataUrl = await compressImage(canvas, quality);
         while (dataUrl.length > 68000 && quality > 0.1) {
@@ -451,7 +485,7 @@ const UserDashboardContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-300">
-      
+
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
         {/* --- Profile Header --- */}
         <motion.div 
@@ -464,7 +498,7 @@ const UserDashboardContent: React.FC = () => {
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
               <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-t from-black/80 to-transparent"></div>
           </div>
-          
+
           <div className="px-6 pb-8 flex flex-col items-center -mt-20 gap-6 relative z-10">
               <div className="relative group">
                 <div className="w-40 h-40 rounded-full border-4 border-white dark:border-zinc-900 overflow-hidden bg-zinc-800 shadow-2xl relative z-10">
@@ -474,7 +508,7 @@ const UserDashboardContent: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                 </div>
-                
+
                 <button 
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute bottom-2 right-2 bg-rose-600 text-white p-2.5 rounded-full border-4 border-white dark:border-zinc-900 z-20 hover:scale-110 transition-transform shadow-lg cursor-pointer"
@@ -484,7 +518,7 @@ const UserDashboardContent: React.FC = () => {
                 </button>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
               </div>
-              
+
               <div className="text-center space-y-1">
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight flex justify-center items-center gap-2 text-gray-900 dark:text-white">
                   {user?.name || "Guest User"}
@@ -507,7 +541,7 @@ const UserDashboardContent: React.FC = () => {
                       <div className="font-black text-2xl text-gray-900 dark:text-white">{orders.length}</div>
                       <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-1">Orders</div>
                   </div>
-                  
+
                   {/* --- Naira Balance UI --- */}
                   <div className="flex-1 text-center px-4 py-4 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-200 dark:border-zinc-700">
                       <div className="font-black text-2xl text-green-600">₦{userBalance.toLocaleString()}</div>
@@ -566,7 +600,7 @@ const UserDashboardContent: React.FC = () => {
                   {tabs.find(t => t.label === activeTab)?.icon && React.createElement(tabs.find(t => t.label === activeTab)!.icon, { className: "w-7 h-7 text-rose-600" })}
                   {activeTab}
                 </h2>
-                
+
                 {activeTab === 'My Library' && (() => {
                   const displayedLibrary = isExpanded ? libraryItems : libraryItems.slice(0, 7);
                   return (
@@ -603,40 +637,95 @@ const UserDashboardContent: React.FC = () => {
                 })()}
 
                 {activeTab === 'History' && (() => {
-                  const displayedOrders = isExpanded ? orders : orders.slice(0, 7);
                   return (
-                    <div className="space-y-4">
-                      {loadingOrders ? (
-                          <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
-                      ) : orders.length > 0 ? (
-                          <>
-                              {displayedOrders.map((order) => (
-                                  <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                      <div className="flex items-center gap-4">
-                                          <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
-                                          <div>
-                                              <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
-                                              <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
+                    <div className="space-y-6">
+                      {/* Sub-navigation Tabs for History to choose between Orders or Balance Statement */}
+                      <div className="flex gap-2 border-b border-gray-100 dark:border-zinc-800 pb-3">
+                        <button
+                          onClick={() => { setHistorySubTab('orders'); setIsExpanded(false); }}
+                          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${historySubTab === 'orders' ? 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                        >
+                          Purchase History
+                        </button>
+                        <button
+                          onClick={() => { setHistorySubTab('transactions'); setIsExpanded(false); }}
+                          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${historySubTab === 'transactions' ? 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                        >
+                          Wallet Statements
+                        </button>
+                      </div>
+
+                      {historySubTab === 'orders' ? (
+                        <div className="space-y-4">
+                          {loadingOrders ? (
+                              <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                          ) : orders.length > 0 ? (
+                              <>
+                                  {(isExpanded ? orders : orders.slice(0, 7)).map((order) => (
+                                      <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                          <div className="flex items-center gap-4">
+                                              <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
+                                              <div>
+                                                  <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
+                                                  <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+                                              <div className="font-bold text-lg font-mono text-rose-600">₦{(order.total || 0).toFixed(2)}</div>
+                                              <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
+                                                  {order.status === 'Completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                                  {order.status || 'Pending'}
+                                              </span>
                                           </div>
                                       </div>
-                                      <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-                                          <div className="font-bold text-lg font-mono text-rose-600">₦{(order.total || 0).toFixed(2)}</div>
-                                          <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
-                                              {order.status === 'Completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                              {order.status || 'Pending'}
-                                          </span>
+                                  ))}
+                                  {orders.length > 7 && (
+                                      <div className="flex justify-center mt-6">
+                                          <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                              {isExpanded ? 'See Less' : 'See More'}
+                                          </button>
                                       </div>
-                                  </div>
-                              ))}
-                              {orders.length > 7 && (
-                                  <div className="flex justify-center mt-6">
-                                      <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
-                                          {isExpanded ? 'See Less' : 'See More'}
-                                      </button>
-                                  </div>
-                              )}
-                          </>
-                      ) : <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />}
+                                  )}
+                              </>
+                          ) : <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />}
+                        </div>
+                      ) : (
+                        /* Transactions Layout Block */
+                        <div className="space-y-4">
+                          {loadingTransactions ? (
+                              <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                          ) : transactions.length > 0 ? (
+                              <>
+                                  {(isExpanded ? transactions : transactions.slice(0, 7)).map((trans) => {
+                                      const isDeposit = trans.type === 'deposit';
+                                      return (
+                                          <div key={trans.id} className="p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex justify-between items-center gap-4">
+                                              <div className="flex items-center gap-4">
+                                                  <div className={`p-2.5 rounded-xl border ${isDeposit ? 'bg-green-50 dark:bg-green-500/10 text-green-600 border-green-200 dark:border-green-500/20' : 'bg-red-50 dark:bg-red-500/10 text-red-500 border-red-200 dark:border-red-500/20'}`}>
+                                                      {isDeposit ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                                                  </div>
+                                                  <div>
+                                                      <div className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">{trans.description || (isDeposit ? 'Account Funded' : 'Product Purchase')}</div>
+                                                      <div className="text-xs text-gray-500 mt-0.5">{trans.createdAt ? new Date(trans.createdAt).toLocaleString() : 'Recent'}</div>
+                                                  </div>
+                                              </div>
+                                              <div className={`font-mono font-bold text-base sm:text-lg ${isDeposit ? 'text-green-600' : 'text-red-500'}`}>
+                                                  {isDeposit ? '+' : '-'}₦{Number(trans.amount || 0).toLocaleString()}
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                                  {transactions.length > 7 && (
+                                      <div className="flex justify-center mt-6">
+                                          <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                              {isExpanded ? 'See Less' : 'See More'}
+                                          </button>
+                                      </div>
+                                  )}
+                              </>
+                          ) : <EmptyState icon={Wallet} text="No financial movements recorded yet" />}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}

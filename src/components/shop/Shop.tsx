@@ -278,12 +278,13 @@ const ShopContent: React.FC = () => {
               viewport={{ once: false }}
               className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col"
             >
-              <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-zinc-800 block cursor-pointer">
+              {/* Added p-2, ensured aspect-square remains, and changed object-cover to object-contain */}
+              <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-zinc-800/50 p-2 block cursor-pointer">
                 {product.image ? (
                    <img 
                     src={product.image} 
                     alt={product.name}
-                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700" 
+                    className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-700" 
                    />
                 ) : (
                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
@@ -291,7 +292,7 @@ const ShopContent: React.FC = () => {
                    </div>
                 )}
 
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 z-10">
                     {product.category === ProductCategory.VST_PLUGIN && (
                         <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded border border-white/10 uppercase tracking-wider flex items-center gap-1">
                             <Cpu className="w-3 h-3" /> VST
@@ -300,12 +301,12 @@ const ShopContent: React.FC = () => {
                 </div>
 
                 {product.price === 0 && (
-                     <div className="absolute top-3 right-3 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
+                     <div className="absolute top-3 right-3 z-10 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
                         Free
                     </div>
                 )}
 
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-20">
                    <div className="p-3 bg-white text-black rounded-full shadow-xl">
                       <Eye className="w-5 h-5" />
                    </div>
