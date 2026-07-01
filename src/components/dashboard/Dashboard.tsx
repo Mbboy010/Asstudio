@@ -13,7 +13,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { doc, updateDoc, collection, query, where, onSnapshot, getDoc, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '@/firebase'; // Added auth import for verification checking
+import { db, auth } from '@/firebase';
 
 const CROP_SIZE = 280;
 
@@ -48,6 +48,7 @@ const UserDashboardContent: React.FC = () => {
   const dispatch = useDispatch();
   const { user, loading: authLoading } = useSelector((state: RootState) => state.auth);
   const [activeTab, setActiveTab] = useState('My Library');
+  const [isExpanded, setIsExpanded] = useState(false); // Controls the "See More" 7-item limit
   const [isSaving, setIsSaving] = useState(false);
   
   const [rawOrders, setRawOrders] = useState<RawOrderItem[]>([]);
@@ -149,29 +150,37 @@ const UserDashboardContent: React.FC = () => {
     const favColRef = collection(db, "users", user.id, "favorites");
     
     const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
-        const favoriteIds = snapshot.docs.map(doc => doc.id);
+        // Collect IDs and potential creation dates to allow sorting by date
+        const favoriteList = snapshot.docs.map(doc => ({
+           id: doc.id,
+           addedAt: doc.data().createdAt || 0
+        }));
 
-        if (favoriteIds.length === 0) {
+        if (favoriteList.length === 0) {
             setFavoriteItems([]);
             setLoadingFavorites(false);
             return;
         }
 
+        // Sort favorites by newest first if a timestamp exists
+        favoriteList.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+
         try {
             const favDetails = await Promise.all(
-                favoriteIds.map(async (prodId: string) => {
-                    const productSnap = await getDoc(doc(db, 'products', prodId));
+                favoriteList.map(async (favItem) => {
+                    const productSnap = await getDoc(doc(db, 'products', favItem.id));
                     if (productSnap.exists()) {
                         const pData = productSnap.data();
                         return {
-                            id: prodId,
+                            id: favItem.id,
                             name: pData.name || 'Unknown Product',
                             image: pData.image || '',
                             category: pData.category || 'Uncategorized',
+                            orderDate: favItem.addedAt,
                             isDeleted: false
                         };
                     }
-                    return { id: prodId, name: 'Item Unavailable', image: '', category: 'N/A', isDeleted: true };
+                    return { id: favItem.id, name: 'Item Unavailable', image: '', category: 'N/A', orderDate: favItem.addedAt, isDeleted: true };
                 })
             );
             setFavoriteItems(favDetails);
@@ -205,6 +214,7 @@ const UserDashboardContent: React.FC = () => {
                 };
             }) as RawOrderItem[];
             
+            // Ensures History tab displays descending by creation date (newest first)
             fetchedOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
             setRawOrders(fetchedOrders);
             if (fetchedOrders.length === 0) setLoadingOrders(false);
@@ -267,6 +277,10 @@ const UserDashboardContent: React.FC = () => {
                     });
                 }
             });
+
+            // Sort individual library items by order date chronologically (newest first)
+            allItems.sort((a, b) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime());
+            
             setLibraryItems(allItems);
         } catch (error) {
             console.error("Enrichment error:", error);
@@ -501,7 +515,6 @@ const UserDashboardContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* --- Replaced Input block with simple Add Money Action Button --- */}
                 <div className="w-full flex justify-center mt-1">
                     <button
                       onClick={() => setIsFundModalOpen(true)}
@@ -522,7 +535,10 @@ const UserDashboardContent: React.FC = () => {
               {tabs.map(item => (
                 <button 
                   key={item.id} 
-                  onClick={() => setActiveTab(item.label)}
+                  onClick={() => {
+                    setActiveTab(item.label);
+                    setIsExpanded(false); // Reset expansion limit when switching tabs
+                  }}
                   className={`w-full flex items-center gap-3 px-5 py-4 rounded-xl transition-all text-left font-bold ${
                     activeTab === item.label 
                     ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20 scale-[1.02]' 
@@ -551,101 +567,149 @@ const UserDashboardContent: React.FC = () => {
                   {activeTab}
                 </h2>
                 
-                {activeTab === 'My Library' && (
-                  <div>
-                      {loadingOrders ? (
-                          <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
-                      ) : libraryItems.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {libraryItems.map((item, idx) => (
-                                  <div key={`${item.id}-${idx}`} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60 grayscale' : 'hover:border-rose-500/50'}`}>
-                                      <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
-                                          {item.isDeleted ? <Box className="w-8 h-8 text-gray-400" /> : <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                          <h3 className="font-bold truncate text-gray-900 dark:text-white">{item.name}</h3>
-                                          <p className="text-xs text-gray-500 mb-2">{item.category}</p>
-                                          {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"><Download className="w-3 h-3" /> Download</button>}
-                                      </div>
-                                  </div>
-                              ))}
-                          </div>
-                      ) : <EmptyState icon={Box} text="Your library is empty" actionText="Browse Shop" />}
-                  </div>
-                )}
+                {activeTab === 'My Library' && (() => {
+                  const displayedLibrary = isExpanded ? libraryItems : libraryItems.slice(0, 7);
+                  return (
+                    <div>
+                        {loadingOrders ? (
+                            <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
+                        ) : libraryItems.length > 0 ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {displayedLibrary.map((item, idx) => (
+                                        <div key={`${item.id}-${idx}`} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60 grayscale' : 'hover:border-rose-500/50'}`}>
+                                            <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
+                                                {item.isDeleted ? <Box className="w-8 h-8 text-gray-400" /> : <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold truncate text-gray-900 dark:text-white">{item.name}</h3>
+                                                <p className="text-xs text-gray-500 mb-2">{item.category}</p>
+                                                {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"><Download className="w-3 h-3" /> Download</button>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {libraryItems.length > 7 && (
+                                    <div className="flex justify-center mt-8">
+                                        <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                            {isExpanded ? 'See Less' : 'See More'}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : <EmptyState icon={Box} text="Your library is empty" actionText="Browse Shop" />}
+                    </div>
+                  );
+                })()}
 
-                {activeTab === 'History' && (
+                {activeTab === 'History' && (() => {
+                  const displayedOrders = isExpanded ? orders : orders.slice(0, 7);
+                  return (
                     <div className="space-y-4">
                       {loadingOrders ? (
                           <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
                       ) : orders.length > 0 ? (
-                          orders.map((order) => (
-                              <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                  <div className="flex items-center gap-4">
-                                      <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
-                                      <div>
-                                          <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
-                                          <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
+                          <>
+                              {displayedOrders.map((order) => (
+                                  <div key={order.id} className="p-5 rounded-2xl bg-gray-50 dark:bg-zinc-800/30 border border-gray-200 dark:border-zinc-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                      <div className="flex items-center gap-4">
+                                          <div className={`p-3 rounded-full ${order.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500'}`}><Package className="w-5 h-5" /></div>
+                                          <div>
+                                              <div className="font-bold font-mono text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</div>
+                                              <div className="text-sm text-gray-500 flex items-center gap-2"><span>{new Date(order.createdAt).toLocaleDateString()}</span><span>•</span><span>{order.items?.length || 0} Items</span></div>
+                                          </div>
+                                      </div>
+                                      <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+                                          <div className="font-bold text-lg font-mono text-rose-600">₦{(order.total || 0).toFixed(2)}</div>
+                                          <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
+                                              {order.status === 'Completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                              {order.status || 'Pending'}
+                                          </span>
                                       </div>
                                   </div>
-                                  <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-                                      <div className="font-bold text-lg font-mono text-rose-600">₦{(order.total || 0).toFixed(2)}</div>
-                                      <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${getStatusColor(order.status || 'Pending')}`}>
-                                          {order.status === 'Completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                          {order.status || 'Pending'}
-                                      </span>
+                              ))}
+                              {orders.length > 7 && (
+                                  <div className="flex justify-center mt-6">
+                                      <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                          {isExpanded ? 'See Less' : 'See More'}
+                                      </button>
                                   </div>
-                              </div>
-                          ))
+                              )}
+                          </>
                       ) : <EmptyState icon={Clock} text="No order history found" actionText="Start Shopping" />}
                     </div>
-                )}
+                  );
+                })()}
 
-                {activeTab === 'Downloads' && (
+                {activeTab === 'Downloads' && (() => {
+                  const displayedDownloads = isExpanded ? libraryItems : libraryItems.slice(0, 7);
+                  return (
                    <div>
                     {libraryItems.length > 0 ? (
-                        <div className="space-y-3">
-                            {libraryItems.map((item, idx) => (
-                                <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
-                                            {item.isDeleted ? <Box className="w-4 h-4 text-gray-400" /> : <img src={item.image} className="w-full h-full object-cover" />}
+                        <>
+                            <div className="space-y-3">
+                                {displayedDownloads.map((item, idx) => (
+                                    <div key={`${item.id}-${idx}-dl`} className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-800/30 border flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                                                {item.isDeleted ? <Box className="w-4 h-4 text-gray-400" /> : <img src={item.image} className="w-full h-full object-cover" />}
+                                            </div>
+                                            <h3 className="font-bold text-sm text-gray-900 dark:text-white">{item.name}</h3>
                                         </div>
-                                        <h3 className="font-bold text-sm text-gray-900 dark:text-white">{item.name}</h3>
+                                        {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="p-2 bg-white dark:bg-black rounded-lg border text-gray-500 hover:text-rose-600 transition-all"><Download className="w-4 h-4" /></button>}
                                     </div>
-                                    {!item.isDeleted && <button onClick={() => handleDownloadItem(item)} className="p-2 bg-white dark:bg-black rounded-lg border text-gray-500 hover:text-rose-600 transition-all"><Download className="w-4 h-4" /></button>}
+                                ))}
+                            </div>
+                            {libraryItems.length > 7 && (
+                                <div className="flex justify-center mt-6">
+                                    <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                        {isExpanded ? 'See Less' : 'See More'}
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     ) : <EmptyState icon={Download} text="No downloads available" actionText="Browse Shop" />}
                   </div>
-                )}
+                  );
+                })()}
 
-                {activeTab === 'Favorites' && (
+                {activeTab === 'Favorites' && (() => {
+                  const displayedFavorites = isExpanded ? favoriteItems : favoriteItems.slice(0, 7);
+                  return (
                     <div>
                         {loadingFavorites ? (
                             <div className="flex justify-center py-20"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>
                         ) : favoriteItems.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {favoriteItems.map((item) => (
-                                    <div key={item.id} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60' : 'hover:border-rose-500/50'}`}>
-                                        <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
-                                            {!item.isDeleted && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className={`font-bold truncate ${item.isDeleted ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>{item.name}</h3>
-                                            <p className="text-xs text-gray-500 mb-3">{item.category}</p>
-                                            <div className="flex gap-4">
-                                                {!item.isDeleted && <Link href={`/product/${item.id}`} className="text-xs font-bold text-rose-600 hover:underline">View Item</Link>}
-                                                <button onClick={() => handleRemoveFavorite(item.id)} className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"><HeartOff className="w-3 h-3" /> Remove</button>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {displayedFavorites.map((item) => (
+                                        <div key={item.id} className={`group p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/50 transition-all flex gap-4 ${item.isDeleted ? 'opacity-60' : 'hover:border-rose-500/50'}`}>
+                                            <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-xl overflow-hidden shrink-0">
+                                                {!item.isDeleted && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className={`font-bold truncate ${item.isDeleted ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>{item.name}</h3>
+                                                <p className="text-xs text-gray-500 mb-3">{item.category}</p>
+                                                <div className="flex gap-4">
+                                                    {!item.isDeleted && <Link href={`/product/${item.id}`} className="text-xs font-bold text-rose-600 hover:underline">View Item</Link>}
+                                                    <button onClick={() => handleRemoveFavorite(item.id)} className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"><HeartOff className="w-3 h-3" /> Remove</button>
+                                                </div>
                                             </div>
                                         </div>
+                                    ))}
+                                </div>
+                                {favoriteItems.length > 7 && (
+                                    <div className="flex justify-center mt-8">
+                                        <button onClick={() => setIsExpanded(!isExpanded)} className="px-6 py-2.5 text-sm font-bold border border-gray-200 dark:border-zinc-700 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                                            {isExpanded ? 'See Less' : 'See More'}
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </>
                         ) : <EmptyState icon={Heart} text="No favorites yet" actionText="Explore Products" />}
                     </div>
-                )}
+                  );
+                })()}
 
                 {activeTab === 'Settings' && (
                     <div className="max-w-2xl space-y-8">
