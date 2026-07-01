@@ -6,7 +6,7 @@ import UserDashboardContent from "@/components/dashboard/Dashboard";
 const SITE_URL = 'https://asstudio.vercel.app';
 
 export const metadata: Metadata = {
-  title: 'My Account | A.S STUDIO',
+  title: 'My Account',
   description: 'Manage your digital assets, downloads, and profile settings at A.S STUDIO.',
   
   // 1. PRIVACY: Keep dashboard out of Google Search
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
   // 2. FACEBOOK / WHATSAPP / DISCORD (Open Graph)
   openGraph: {
-    title: 'User Dashboard | A.S STUDIO',
+    title: 'User Dashboard',
     description: 'Access your premium beats, kits, and exclusive content.',
     url: `${SITE_URL}/dashboard`,
     siteName: 'A.S STUDIO',

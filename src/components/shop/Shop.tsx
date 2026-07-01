@@ -32,7 +32,6 @@ const ShopContent: React.FC = () => {
 
   const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setAlertConfig({ show: true, message, type });
-    
   };
 
   const [loading, setLoading] = useState(true);
@@ -266,7 +265,8 @@ const ShopContent: React.FC = () => {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 min-h-[600px]">
+      {/* Product Display Grid formatted exactly like 1000632389.jpg */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 min-h-[600px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
         ) : currentItems.length > 0 ? (
@@ -276,78 +276,54 @@ const ShopContent: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false }}
-              className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col"
+              className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col p-3 sm:p-4"
             >
-              {/* Added p-2, ensured aspect-square remains, and changed object-cover to object-contain */}
-              <Link href={`/product/${product.id}`} className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-zinc-800/50 p-2 block cursor-pointer">
+              {/* Image Frame Wrapper with internal padding matching 1000632389.jpg */}
+              <Link href={`/product/${product.id}`} className="relative aspect-square w-full overflow-hidden bg-gray-100 dark:bg-zinc-800/50 rounded-xl block cursor-pointer p-4 flex items-center justify-center">
                 {product.image ? (
                    <img 
                     src={product.image} 
                     alt={product.name}
-                    className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-700" 
+                    className="object-contain max-w-full max-h-full rounded-md group-hover:scale-102 transition-transform duration-500" 
                    />
                 ) : (
                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
-                      <ImageIcon className="w-12 h-12 opacity-50" />
+                      <ImageIcon className="w-10 h-10 opacity-40" />
                    </div>
                 )}
 
-                <div className="absolute top-3 left-3 z-10">
-                    {product.category === ProductCategory.VST_PLUGIN && (
-                        <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded border border-white/10 uppercase tracking-wider flex items-center gap-1">
-                            <Cpu className="w-3 h-3" /> VST
-                        </div>
-                    )}
+                {/* Category Pill Tag */}
+                <div className="absolute top-2 left-2 z-10">
+                  <div className="bg-black/75 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                    {product.category === ProductCategory.VST_PLUGIN ? 'VST Plugin' : 'Sample Pack'}
+                  </div>
                 </div>
 
-                {product.price === 0 && (
-                     <div className="absolute top-3 right-3 z-10 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
-                        Free
-                    </div>
-                )}
-
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-20">
-                   <div className="p-3 bg-white text-black rounded-full shadow-xl">
-                      <Eye className="w-5 h-5" />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px] z-20">
+                   <div className="p-2 bg-white text-black rounded-full shadow-lg">
+                      <Eye className="w-4 h-4" />
                    </div>
                 </div>
               </Link>
 
-              <div className="p-5 flex flex-col flex-grow">
-                 <div className="flex justify-between items-start mb-3">
-                   <div className="flex-1 pr-2 overflow-hidden">
-                      <Link href={`/product/${product.id}`} className="hover:text-rose-600 transition-colors block">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate">{product.name}</h3>
-                      </Link>
-                      <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mt-1 uppercase">
-                         {product.category}
-                         <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-700"></span>
-                         <span className="flex items-center gap-0.5 text-yellow-500"><Star className="w-3 h-3 fill-current" /> {product.rating}</span>
-                      </div>
-                   </div>
-                   <span className="font-mono font-bold text-lg text-gray-900 dark:text-white">
+              {/* Text Layout Matching 1000632389.jpg */}
+              <div className="pt-4 flex flex-col flex-grow">
+                <Link href={`/product/${product.id}`} className="hover:text-rose-500 transition-colors block mb-3">
+                  <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base line-clamp-1">
+                    {product.name}
+                  </h3>
+                </Link>
+
+                {/* Bottom Row: Price Left, Star Rating Right */}
+                <div className="mt-auto flex justify-between items-center text-sm font-bold">
+                   <span className="text-rose-600 dark:text-rose-500 tracking-wide font-mono">
                       {product.price === 0 ? 'FREE' : `₦${product.price}`}
                    </span>
-                 </div>
-
-                 <div className="mt-auto pt-4 border-t border-gray-100 dark:border-zinc-800">
-                    {product.price === 0 ? (
-                        <button 
-                            onClick={() => handleDownload(product)}
-                            disabled={downloadingId === product.id}
-                            className="w-full py-2.5 bg-gray-100 dark:bg-zinc-800 hover:bg-rose-600 hover:text-white transition-all rounded-lg font-bold flex items-center justify-center gap-2 text-sm"
-                        >
-                            {downloadingId === product.id ? <Loader className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4" />} Download
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={() => handleAddToCart(product)}
-                            className="w-full py-2.5 bg-black dark:bg-white text-white dark:text-black hover:bg-rose-600 dark:hover:bg-rose-500 hover:text-white dark:hover:text-white transition-all rounded-lg font-bold flex items-center justify-center gap-2 text-sm"
-                        >
-                            <ShoppingCart className="w-4 h-4" /> Add to Cart
-                        </button>
-                    )}
-                 </div>
+                   <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                     <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" /> 
+                     {product.rating || 5}
+                   </span>
+                </div>
               </div>
             </motion.div>
           ))

@@ -52,21 +52,23 @@ const LoginView: React.FC = () => {
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
+      // Added balance: 600 for new Google registrations
       if (!docSnap.exists()) {
-        const isDevAdmin = user.email === 'admin@asstudio.com'; 
+        const isDevAdmin = user.email === 'admin@asstudio.com';
         await setDoc(doc(db, "users", user.uid), {
             id: user.uid,
             name: user.displayName || 'User',
             email: user.email,
+            phone: '',
             role: isDevAdmin ? 'admin' : 'user',
-            // Added encodeURIComponent to handle spaces in names
+            balance: 600,
             avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
             joinedAt: new Date().toISOString()
         });
       }
 
-      window.location.href = '/dashboard';
-    } catch (err: unknown) { // Changed 'any' to 'unknown'
+      router.push('/dashboard');
+    } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       setError(firebaseError.message.replace('Firebase: ', ''));
     } finally {
