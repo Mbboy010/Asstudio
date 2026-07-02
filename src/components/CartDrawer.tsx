@@ -18,6 +18,9 @@ import {
 import { db, auth } from '../firebase';
 import { onAuthStateChanged, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
 
+// 1. Import the official Google Analytics tracking function
+import { sendGAEvent } from '@next/third-parties/google';
+
 interface CartItem {
   id: string;
   name: string;
@@ -46,10 +49,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   
-  // --- NEW: User Balance State ---
+  // --- User Balance State ---
   const [userBalance, setUserBalance] = useState<number>(0);
 
-  // --- NEW: Custom Alert State ---
+  // --- Custom Alert State ---
   const [alertConfig, setAlertConfig] = useState<AlertConfig>({
     show: false,
     message: '',
@@ -81,7 +84,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       setIsLoading(false);
     });
 
-    // --- NEW: Listen to Balance ---
+    // --- Listen to Balance ---
     const userRef = doc(db, "users", user.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -160,6 +163,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         return;
       }
 
+      const timestamp = new Date().toISOString();
+      const generatedTxnId = `STU-${Math.floor(100000 + Math.random() * 900000)}`;
+
       // --- Deduct Balance and Update Total Spent ---
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
@@ -167,10 +173,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         totalSpent: increment(subtotal)
       });
 
+      // --- Log Checkout into user transaction history ---
+      const transactionRef = collection(db, "users", user.uid, "transactions");
+      await addDoc(transactionRef, {
+        type: 'Debit',
+        description: items.length === 1 ? `Purchased ${items[0].name}` : `Purchased ${items.length} studio items`,
+        amount: subtotal,
+        reference: generatedTxnId,
+        status: 'Successful',
+        createdAt: timestamp
+      });
+
       // Map to just id and savedAt
       const sortedItems = items.map(item => ({
         id: item.id,
-        savedAt: new Date().toISOString()
+        savedAt: timestamp
       }));
 
       // 1. Create Order
@@ -180,7 +197,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         items: sortedItems,
         total: subtotal,
         status: 'Completed',
-        createdAt: new Date().toISOString()
+        createdAt: timestamp
       });
 
       // 2. Clear Firestore Cart (Batch delete)
@@ -189,6 +206,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       const batch = writeBatch(db);
       snapshot.docs.forEach((d) => batch.delete(d.ref));
       await batch.commit();
+
+      // --- 2. Track E-commerce Purchase Event in Google Analytics ---
+      sendGAEvent({
+        event: 'purchase',
+        ecommerce: {
+          transaction_id: generatedTxnId,
+          value: subtotal,
+          currency: 'NGN',
+          items: items.map(item => ({
+            item_id: item.id,
+            item_name: item.name,
+            price: item.price,
+            quantity: item.quantity
+          }))
+        }
+      });
 
       onClose();
       router.push('/dashboard');
@@ -293,7 +326,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             {items.length > 0 && (
               <div className="p-6 border-t dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/50 relative z-10">
                 
-                {/* --- Available Balance Display --- */}
+                {/* Available Balance Display */}
                 <div className="flex justify-between items-center mb-3 p-3 bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl">
                   <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                     <Wallet size={16} />
@@ -320,7 +353,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            {/* --- Custom Alert Overlay --- */}
+            {/* Custom Alert Overlay */}
             <AnimatePresence>
               {alertConfig.show && (
                 <motion.div

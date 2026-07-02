@@ -9,6 +9,9 @@ import { AuthProvider } from "./AuthContext";
 import AuthGuard from "./AuthGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 
+// 1. Import the official Google Analytics tracker tool for Next.js
+import { GoogleAnalytics } from '@next/third-parties/google';
+
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
@@ -67,6 +70,9 @@ export default function RootLayout({
         </Providers>
           </AuthGuard>
          </AuthProvider>
+
+        {/* 2. Google Analytics Tracking Code */}
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-JBG8LVZNR3'} />
       </body>
     </html>
   );
