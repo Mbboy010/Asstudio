@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Menu } from 'lucide-react';
+import Head from 'next/head'; // Fallback if needed, but standard JSX tags work beautifully here
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
@@ -10,6 +11,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] bg-gray-50 dark:bg-black relative">
+      {/* 
+        CRITICAL PRIVACY GUARD: 
+        Because this is a 'use client' file, we inject raw HTML meta elements 
+        to ensure Google blocks this layout and all nested admin views from search engines.
+      */}
+      <head>
+        <title>Admin Panel | Asstudio</title>
+        <meta name="robots" content="noindex, nofollow, nocache" />
+        <meta name="googlebot" content="noindex, nofollow" />
+      </head>
       
       {/* Mobile Header */}
       <div className="md:hidden bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 p-4 flex items-center justify-between sticky top-0 z-30">

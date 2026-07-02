@@ -2,44 +2,43 @@ import React from 'react';
 import { Metadata } from 'next';
 import UserDashboardContent from "@/components/dashboard/Dashboard";
 
-// Define your base URL (replace with your actual domain)
-const SITE_URL = 'https://asstudio.vercel.app';
+// Updated base URL to match your permanent custom domain
+const SITE_URL = 'https://asstudio.com.ng';
 
 export const metadata: Metadata = {
   title: 'My Account',
-  description: 'Manage your digital assets, downloads, and profile settings at A.S STUDIO.',
+  description: 'Manage your digital assets, downloads, and profile settings at ASstudio.',
   
-  // 1. PRIVACY: Keep dashboard out of Google Search
+  // 1. PRIVACY: Keep dashboard pages out of public Google Search results
   robots: {
     index: false,
     follow: false,
     nocache: true,
   },
 
-  // 2. FACEBOOK / WHATSAPP / DISCORD (Open Graph)
+  // 2. OPEN GRAPH (Facebook / WhatsApp / Telegram)
   openGraph: {
-    title: 'User Dashboard',
-    description: 'Access your premium beats, kits, and exclusive content.',
+    title: 'User Dashboard | ASstudio',
+    description: 'Access your premium sound kits, VST presets, and download history.',
     url: `${SITE_URL}/dashboard`,
-    siteName: 'A.S STUDIO',
+    siteName: 'ASstudio',
     images: [
       {
-        url: `${SITE_URL}/android-chrome-512x512.png`, // A clean, professional dashboard preview image
-        width: 1200,
-        height: 630,
-        alt: 'A.S STUDIO User Portal',
+        url: `${SITE_URL}/android-chrome-512x512.png`,
+        width: 512,
+        height: 512,
+        alt: 'ASstudio User Portal',
       },
     ],
     type: 'website',
   },
 
-  // 3. X / TWITTER..
+  // 3. X / TWITTER
   twitter: {
-    card: 'summary_large_image',
-    title: 'My Dashboard | A.S STUDIO',
+    card: 'summary',
+    title: 'My Dashboard | ASstudio',
     description: 'Manage your music production assets.',
     images: [`${SITE_URL}/android-chrome-512x512.png`],
-    creator: '@asstudio_official',
   },
 };
 

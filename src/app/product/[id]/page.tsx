@@ -13,10 +13,10 @@ interface Product {
   [key: string]: unknown;
 }
 
+const SITE_URL = 'https://asstudio.com.ng';
+
 const stripHtml = (html: string) =>
   html?.replace(/<[^>]*>?/gm, '').substring(0, 160) || '';
-  
-  
 
 async function getProduct(id: string): Promise<Product | null> {
   try {
@@ -45,8 +45,6 @@ async function getProduct(id: string): Promise<Product | null> {
   }
 }
 
-
-
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
@@ -56,25 +54,48 @@ export async function generateMetadata(
 
   if (!product) {
     return { title: 'Product Not Found' };
-    
   }
 
-  const title = `${product.name || 'Product'} | AS Studio`;
+  const productName = product.name || 'Premium Audio Tool';
+  const title = `${productName} | Asstudio`;
   const description = stripHtml(
-    product.description || 'Exclusive digital assets.'
+    product.description || 'Download premium audio tools, sample packs, and VST presets on Asstudio.'
   );
-  const imageUrl =
-    product.image || 'https://asstudio.vercel.app/android-chrome-512x512.png';
+  
+  // Update fallback URL to your permanent domain
+  const imageUrl = product.image || `${SITE_URL}/android-chrome-512x512.png`;
+
+  // Dynamically generate targeted keywords matching the product name
+  const dynamicKeywords = [
+    productName.toLowerCase(),
+    `${productName.toLowerCase()} download`,
+    "asstudio",
+    "sample packs",
+    "vst presets",
+    "sound kits",
+    "music production"
+  ];
 
   return {
     title,
     description,
+    keywords: dynamicKeywords,
+    
+    // Allow Google to index all your unique product pages
+    robots: {
+      index: true,
+      follow: true,
+    },
+    
     openGraph: {
       title,
       description,
-      images: [{ url: imageUrl, width: 1200, height: 630 }],
+      url: product.slug ? `${SITE_URL}/product/${product.slug}` : `${SITE_URL}`,
+      siteName: 'Asstudio',
+      images: [{ url: imageUrl, width: 1200, height: 630, alt: productName }],
       type: 'website',
     },
+    
     twitter: {
       card: 'summary_large_image',
       title,
@@ -92,7 +113,7 @@ export default async function Page(
   const product = await getProduct(id);
 
   if (!product) {
-    console.log(product)
+    console.log(product);
     notFound();
   }
 

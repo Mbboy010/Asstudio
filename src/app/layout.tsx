@@ -19,37 +19,53 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
 export const metadata: Metadata = {
-  // Tell Next.js your domain so it can find images in the /public folder
-  metadataBase: new URL('https://asstudio.vercel.app'), 
+  // Point to your live custom domain for clean search indexing
+  metadataBase: new URL('https://asstudio.com.ng'), 
   
-  title: "Asstudio | Future of Sound",
-  description: "A high-end, futuristic marketplace for music studio tools, offering sample packs, presets, and audio software with a cyber-aesthetic interface.",
-  keywords: ["vst plugins", "sample packs", "presets", "audio software", "music production"],
+  title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+  description: "The ultimate cyber-aesthetic marketplace for modern music producers. Access premium, high-end sample packs, VST presets, drum kits, and audio software designed for the future of sound.",
+  keywords: [
+    "asstudio", "as studio music", "futuristic sound packs", "premium sample packs", 
+    "vst presets", "audio software", "music production tools", "hausa drum packs", 
+    "amapiano loop kits", "cyberpunk audio marketplace"
+  ],
+  authors: [{ name: "Mbboy" }],
+  creator: "Mbboy",
   
   openGraph: {
-    title: "Asstudio | Future of Sound",
-    description: "Premium audio tools for modern producers.",
-    url: "https://asstudio.vercel.app",
-    siteName: "Asstudio",
+    title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+    description: "Step into the future of sound. Download premium sample packs, VST presets, and elite production software.",
+    url: "https://asstudio.com.ng",
+    siteName: "ASstudio",
     images: [
       {
-        // Point to the image in your public folder
         url: "/android-chrome-512x512.png", 
         width: 512,
         height: 512,
-        alt: "Asstudio Logo",
+        alt: "ASstudio - Future of Sound",
       },
     ],
     locale: "en_US",
     type: "website",
   },
   
-  // Twitter/X requires its own object to display properly
   twitter: {
-    card: "summary", // Use "summary" for square images like your 512x512 logo
-    title: "Asstudio | Future of Sound",
-    description: "Premium audio tools for modern producers.",
+    card: "summary_large_image",
+    title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+    description: "Premium sound design tools, sample packs, and custom VST presets with a high-end cyber interface.",
     images: ["/android-chrome-512x512.png"],
+  },
+  
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 
@@ -62,7 +78,7 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         {/* 3. Official Google AdSense Integration */}
-   <Script
+        <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9241182560906060"
           crossOrigin="anonymous"
@@ -70,10 +86,6 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${firaCode.variable} font-sans`}>
-
-
-
-
         
         <AuthProvider>
           <AuthGuard>
@@ -83,7 +95,7 @@ export default function RootLayout({
               {children}
               <CookieConsent />
             </MainLayout>
-        </Providers>
+           </Providers>
           </AuthGuard>
          </AuthProvider>
 
