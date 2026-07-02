@@ -12,11 +12,14 @@ import { CookieConsent } from "@/components/CookieConsent";
 // 1. Import the official Google Analytics tracker tool for Next.js
 import { GoogleAnalytics } from '@next/third-parties/google';
 
+// 2. Import Next.js Script component for safe third-party scripts
+import Script from 'next/script';
+
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
 export const metadata: Metadata = {
-  // 1. Tell Next.js your domain so it can find images in the /public folder
+  // Tell Next.js your domain so it can find images in the /public folder
   metadataBase: new URL('https://asstudio.vercel.app'), 
   
   title: "Asstudio | Future of Sound",
@@ -30,7 +33,7 @@ export const metadata: Metadata = {
     siteName: "Asstudio",
     images: [
       {
-        // 2. Point to the image in your public folder
+        // Point to the image in your public folder
         url: "/android-chrome-512x512.png", 
         width: 512,
         height: 512,
@@ -41,7 +44,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   
-  // 3. Twitter/X requires its own object to display properly
+  // Twitter/X requires its own object to display properly
   twitter: {
     card: "summary", // Use "summary" for square images like your 512x512 logo
     title: "Asstudio | Future of Sound",
@@ -57,6 +60,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* 3. Official Google AdSense Integration */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9241182560906060"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className={`${inter.variable} ${firaCode.variable} font-sans`}>
         
         <AuthProvider>
@@ -71,7 +83,7 @@ export default function RootLayout({
           </AuthGuard>
          </AuthProvider>
 
-        {/* 2. Google Analytics Tracking Code */}
+        {/* 4. Google Analytics Tracking Code */}
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-JBG8LVZNR3'} />
       </body>
     </html>
