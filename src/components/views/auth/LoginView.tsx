@@ -25,12 +25,16 @@ const LoginView: React.FC = () => {
 
   // Handle the redirect result when the browser comes back to your site
   useEffect(() => {
+    let isMounted = true;
+
     const handleRedirectResult = async () => {
       try {
-        setLoading(true);
+        if (!auth) return;
+        
         const result = await getRedirectResult(auth);
         
-        if (result) {
+        if (result && isMounted) {
+          setLoading(true);
           const user = result.user;
 
           const docRef = doc(db, "users", user.uid);
@@ -54,14 +58,23 @@ const LoginView: React.FC = () => {
           router.push('/dashboard');
         }
       } catch (err: unknown) {
-        const firebaseError = err as FirebaseError;
-        setError(firebaseError.message.replace('Firebase: ', ''));
+        console.error("Redirect connection safely isolated:", err);
+        if (isMounted) {
+          const firebaseError = err as FirebaseError;
+          setError(firebaseError.message.replace('Firebase: ', ''));
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     handleRedirectResult();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
