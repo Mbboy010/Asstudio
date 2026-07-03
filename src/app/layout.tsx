@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   // Point to your live custom domain for clean search indexing
   metadataBase: new URL('https://asstudio.com.ng'), 
   
-  title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+  title: "Asstudio | Next-Gen Music Tools & Sound Packs",
   description: "The ultimate cyber-aesthetic marketplace for modern music producers. Access premium, high-end sample packs, VST presets, drum kits, and audio software designed for the future of sound.",
   keywords: [
     "asstudio", "as studio music", "futuristic sound packs", "premium sample packs", 
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   creator: "Mbboy",
   
   openGraph: {
-    title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+    title: "Asstudio | Next-Gen Music Tools & Sound Packs",
     description: "Step into the future of sound. Download premium sample packs, VST presets, and elite production software.",
     url: "https://asstudio.com.ng",
     siteName: "ASstudio",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
         url: "/android-chrome-512x512.png", 
         width: 512,
         height: 512,
-        alt: "ASstudio - Future of Sound",
+        alt: "Asstudio - Future of Sound",
       },
     ],
     locale: "en_US",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   
   twitter: {
     card: "summary_large_image",
-    title: "ASstudio | Next-Gen Music Tools & Sound Packs",
+    title: "Asstudio | Next-Gen Music Tools & Sound Packs",
     description: "Premium sound design tools, sample packs, and custom VST presets with a high-end cyber interface.",
     images: ["/android-chrome-512x512.png"],
   },

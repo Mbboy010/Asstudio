@@ -18,16 +18,16 @@ export const metadata: Metadata = {
 
   // 2. OPEN GRAPH (Facebook / WhatsApp / Telegram)
   openGraph: {
-    title: 'User Dashboard | ASstudio',
+    title: 'User Dashboard | Asstudio',
     description: 'Access your premium sound kits, VST presets, and download history.',
     url: `${SITE_URL}/dashboard`,
-    siteName: 'ASstudio',
+    siteName: 'Asstudio',
     images: [
       {
         url: `${SITE_URL}/android-chrome-512x512.png`,
         width: 512,
         height: 512,
-        alt: 'ASstudio User Portal',
+        alt: 'Asstudio User Portal',
       },
     ],
     type: 'website',
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   // 3. X / TWITTER
   twitter: {
     card: 'summary',
-    title: 'My Dashboard | ASstudio',
+    title: 'My Dashboard | Asstudio',
     description: 'Manage your music production assets.',
     images: [`${SITE_URL}/android-chrome-512x512.png`],
   },
