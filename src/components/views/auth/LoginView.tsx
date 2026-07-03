@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { auth, db } from '@/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
@@ -23,6 +23,47 @@ const LoginView: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Handle the redirect result when the browser comes back to your site
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        setLoading(true);
+        const result = await getRedirectResult(auth);
+        
+        if (result) {
+          const user = result.user;
+
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+
+          // Added balance: 600 for new Google registrations
+          if (!docSnap.exists()) {
+            const isDevAdmin = user.email === 'admin@asstudio.com';
+            await setDoc(doc(db, "users", user.uid), {
+                id: user.uid,
+                name: user.displayName || 'User',
+                email: user.email,
+                phone: '',
+                role: isDevAdmin ? 'admin' : 'user',
+                balance: 600,
+                avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
+                joinedAt: new Date().toISOString()
+            });
+          }
+
+          router.push('/dashboard');
+        }
+      } catch (err: unknown) {
+        const firebaseError = err as FirebaseError;
+        setError(firebaseError.message.replace('Firebase: ', ''));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,7 +71,7 @@ const LoginView: React.FC = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard'); 
-    } catch (err: unknown) { // Changed 'any' to 'unknown'
+    } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       // Clean up Firebase error messages for better UX
       let msg = firebaseError.message.replace('Firebase: ', '');
@@ -46,32 +87,11 @@ const LoginView: React.FC = () => {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-
-      // Added balance: 600 for new Google registrations
-      if (!docSnap.exists()) {
-        const isDevAdmin = user.email === 'admin@asstudio.com';
-        await setDoc(doc(db, "users", user.uid), {
-            id: user.uid,
-            name: user.displayName || 'User',
-            email: user.email,
-            phone: '',
-            role: isDevAdmin ? 'admin' : 'user',
-            balance: 600,
-            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
-            joinedAt: new Date().toISOString()
-        });
-      }
-
-      router.push('/dashboard');
+      // Switched from popup to redirect to avoid auth/popup-closed-by-user on mobile browsers
+      await signInWithRedirect(auth, provider);
     } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       setError(firebaseError.message.replace('Firebase: ', ''));
-    } finally {
       setLoading(false);
     }
   };
@@ -165,7 +185,6 @@ const LoginView: React.FC = () => {
       <SocialLogin onClick={handleGoogleLogin} />
 
       <div className="text-center text-sm text-gray-500 mt-8">
-         {/* Fixed: Escaped apostrophe here */}
          Don&apos;t have an account? <a href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</a>
       </div>
     </AuthLayout>

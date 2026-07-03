@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Mail, Phone, Lock, Eye, EyeOff, Loader, ArrowRight } from 'lucide-react';
 import { auth, db } from '@/firebase';
-import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile, GoogleAuthProvider, signInWithRedirect, getRedirectResult, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
@@ -29,6 +29,47 @@ const SignupView: React.FC = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Handle the Google redirect registration payload when coming back
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        setLoading(true);
+        const result = await getRedirectResult(auth);
+        
+        if (result) {
+          const user = result.user;
+
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+
+          // Added balance: 600 for new Google registrations
+          if (!docSnap.exists()) {
+            const isDevAdmin = user.email === 'admin@asstudio.com';
+            await setDoc(doc(db, "users", user.uid), {
+                id: user.uid,
+                name: user.displayName || 'User',
+                email: user.email,
+                phone: '',
+                role: isDevAdmin ? 'admin' : 'user',
+                balance: 600,
+                avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
+                joinedAt: new Date().toISOString()
+            });
+          }
+
+          router.push('/dashboard');
+        }
+      } catch (err: unknown) {
+        const firebaseError = err as FirebaseError;
+        setError(firebaseError.message.replace('Firebase: ', ''));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+  }, [router]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,32 +119,11 @@ const SignupView: React.FC = () => {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-
-      // Added balance: 600 for new Google registrations
-      if (!docSnap.exists()) {
-        const isDevAdmin = user.email === 'admin@asstudio.com';
-        await setDoc(doc(db, "users", user.uid), {
-            id: user.uid,
-            name: user.displayName || 'User',
-            email: user.email,
-            phone: '',
-            role: isDevAdmin ? 'admin' : 'user',
-            balance: 600,
-            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
-            joinedAt: new Date().toISOString()
-        });
-      }
-
-      router.push('/dashboard');
+      // Switched to redirect method to fix auth/popup-closed-by-user bug on mobile devices
+      await signInWithRedirect(auth, provider);
     } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
       setError(firebaseError.message.replace('Firebase: ', ''));
-    } finally {
       setLoading(false);
     }
   };
@@ -230,7 +250,7 @@ const SignupView: React.FC = () => {
              <>Create Account <ArrowRight className="w-5 h-5" /></>
           )}
         </button>
-      </form>
+       </form>
 
       <div className="my-8 flex items-center gap-4">
          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
