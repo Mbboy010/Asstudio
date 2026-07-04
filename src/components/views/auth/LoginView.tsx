@@ -9,7 +9,6 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, get
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
-// Interface for Firebase errors to replace 'any'
 interface FirebaseError {
   message: string;
   code?: string;
@@ -22,25 +21,39 @@ const LoginView: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
 
-  // Handle the redirect result when the browser comes back to your site
   useEffect(() => {
+    setIsClientReady(true);
     let isMounted = true;
 
-    const handleRedirectResult = async () => {
+    const parseAuthRedirect = async () => {
+      if (!auth) return;
+
+      // Force-set loading state on mount if returning from an auth redirect handshake
+      if (window.location.hash.includes('access_token') || window.location.search.includes('apiKey')) {
+        setLoading(true);
+      }
+
+      // Safety Timeout: If Firebase gets permanently stuck processing the redirect payload, 
+      // release the UI loop after 3.5 seconds so the app doesn't freeze black.
+      const safetyTimeout = setTimeout(() => {
+        if (isMounted && loading) {
+          setLoading(false);
+          setError("The connection timed out. Please try logging in again.");
+        }
+      }, 3500);
+
       try {
-        if (!auth) return;
-        
         const result = await getRedirectResult(auth);
+        clearTimeout(safetyTimeout);
         
         if (result && isMounted) {
           setLoading(true);
           const user = result.user;
-
           const docRef = doc(db, "users", user.uid);
           const docSnap = await getDoc(docRef);
 
-          // Added balance: 600 for new Google registrations
           if (!docSnap.exists()) {
             const isDevAdmin = user.email === 'admin@asstudio.com';
             await setDoc(doc(db, "users", user.uid), {
@@ -54,14 +67,18 @@ const LoginView: React.FC = () => {
                 joinedAt: new Date().toISOString()
             });
           }
-
+          
           router.push('/dashboard');
+          return;
         }
       } catch (err: unknown) {
-        console.error("Redirect connection safely isolated:", err);
+        clearTimeout(safetyTimeout);
+        console.error("Caught redirect resolution error safely:", err);
         if (isMounted) {
           const firebaseError = err as FirebaseError;
-          setError(firebaseError.message.replace('Firebase: ', ''));
+          let msg = firebaseError.message || 'Redirect authentication failed.';
+          if (msg.includes('auth/redirect-cancelled-by-user')) msg = 'Sign-in cancelled by user.';
+          setError(msg.replace('Firebase: ', ''));
         }
       } finally {
         if (isMounted) {
@@ -70,12 +87,21 @@ const LoginView: React.FC = () => {
       }
     };
 
-    handleRedirectResult();
+    parseAuthRedirect();
 
     return () => {
       isMounted = false;
     };
   }, [router]);
+
+  // Handle safe hydration render
+  if (!isClientReady) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader className="w-6 h-6 animate-spin text-rose-600" />
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +112,6 @@ const LoginView: React.FC = () => {
       router.push('/dashboard'); 
     } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
-      // Clean up Firebase error messages for better UX
       let msg = firebaseError.message.replace('Firebase: ', '');
       if (msg.includes('auth/invalid-credential')) msg = 'Invalid email or password.';
       setError(msg);
@@ -100,7 +125,6 @@ const LoginView: React.FC = () => {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
-      // Switched from popup to redirect to avoid auth/popup-closed-by-user on mobile browsers
       await signInWithRedirect(auth, provider);
     } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
@@ -112,17 +136,14 @@ const LoginView: React.FC = () => {
   return (
     <AuthLayout title="Welcome Back" subtitle="Enter your credentials to access your studio">
       
-      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm mb-6 border border-red-100 dark:border-red-900/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm mb-6 border border-red-100 dark:border-red-900/20 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-            {error}
+            <span className="flex-1">{error}</span>
         </div>
       )}
 
       <form onSubmit={handleLogin} className="space-y-5">
-        
-        {/* Email Input */}
         <div>
           <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Email Address</label>
           <div className="relative group">
@@ -135,16 +156,15 @@ const LoginView: React.FC = () => {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="producer@studio.com"
-              className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-3.5 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-600" 
+              className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-3.5 focus:border-rose-500 outline-none transition-all font-medium text-gray-900 dark:text-white" 
             />
           </div>
         </div>
 
-        {/* Password Input */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Password</label>
-            <a href="/forgot-password" className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline transition-colors">
+            <a href="/forgot-password" className="text-xs font-bold text-rose-600 hover:underline">
                 Forgot password?
             </a>
           </div>
@@ -158,37 +178,31 @@ const LoginView: React.FC = () => {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-12 py-3.5 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-600" 
+              className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-10 pr-12 py-3.5 focus:border-rose-500 outline-none transition-all font-medium text-gray-900 dark:text-white" 
             />
             <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3.5 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="absolute right-3 top-3.5 p-1 text-gray-400 hover:text-gray-200"
             >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
         
-        {/* Login Button */}
         <button 
             disabled={loading} 
             type="submit" 
-            className="w-full bg-rose-600 text-white font-bold py-4 rounded-xl hover:bg-rose-700 hover:shadow-lg hover:shadow-rose-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+            className="w-full bg-rose-600 text-white font-bold py-4 rounded-xl hover:bg-rose-700 flex items-center justify-center gap-2 disabled:opacity-70 mt-2"
         >
           {loading ? (
-            <>
-               <Loader className="w-5 h-5 animate-spin" /> Logging in...
-            </>
+            <><Loader className="w-5 h-5 animate-spin" /> Logging in...</>
           ) : (
-            <>
-               Log In <ArrowRight className="w-5 h-5" />
-            </>
+            <>Log In <ArrowRight className="w-5 h-5" /></>
           )}
         </button>
       </form>
 
-      {/* Social Login Divider */}
       <div className="my-8 flex items-center gap-4">
          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Or continue with</span>
