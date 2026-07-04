@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { auth, db } from '@/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AuthLayout, SocialLogin } from '@/components/AuthShared';
 
@@ -25,76 +25,8 @@ const LoginView: React.FC = () => {
 
   useEffect(() => {
     setIsClientReady(true);
-    let isMounted = true;
+  }, []);
 
-    const parseAuthRedirect = async () => {
-      if (!auth) return;
-
-      // Force-set loading state on mount if returning from an auth redirect handshake
-      if (window.location.hash.includes('access_token') || window.location.search.includes('apiKey')) {
-        setLoading(true);
-      }
-
-      // Safety Timeout: If Firebase gets permanently stuck processing the redirect payload, 
-      // release the UI loop after 3.5 seconds so the app doesn't freeze black.
-      const safetyTimeout = setTimeout(() => {
-        if (isMounted && loading) {
-          setLoading(false);
-          setError("The connection timed out. Please try logging in again.");
-        }
-      }, 3500);
-
-      try {
-        const result = await getRedirectResult(auth);
-        clearTimeout(safetyTimeout);
-        
-        if (result && isMounted) {
-          setLoading(true);
-          const user = result.user;
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-
-          if (!docSnap.exists()) {
-            const isDevAdmin = user.email === 'admin@asstudio.com';
-            await setDoc(doc(db, "users", user.uid), {
-                id: user.uid,
-                name: user.displayName || 'User',
-                email: user.email,
-                phone: '',
-                role: isDevAdmin ? 'admin' : 'user',
-                balance: 600,
-                avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
-                joinedAt: new Date().toISOString()
-            });
-          }
-          
-          router.push('/dashboard');
-          return;
-        }
-      } catch (err: unknown) {
-        clearTimeout(safetyTimeout);
-        console.error("Caught redirect resolution error safely:", err);
-        if (isMounted) {
-          const firebaseError = err as FirebaseError;
-          let msg = firebaseError.message || 'Redirect authentication failed.';
-          if (msg.includes('auth/redirect-cancelled-by-user')) msg = 'Sign-in cancelled by user.';
-          setError(msg.replace('Firebase: ', ''));
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    parseAuthRedirect();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
-
-  // Handle safe hydration render
   if (!isClientReady) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -125,10 +57,35 @@ const LoginView: React.FC = () => {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      // Using Popup ensures the authentication happens entirely within a safe browser window layer
+      const result = await signInWithPopup(auth, provider);
+      
+      if (result) {
+        const user = result.user;
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+          const isDevAdmin = user.email === 'admin@asstudio.com';
+          await setDoc(doc(db, "users", user.uid), {
+              id: user.uid,
+              name: user.displayName || 'User',
+              email: user.email,
+              phone: '',
+              role: isDevAdmin ? 'admin' : 'user',
+              balance: 600,
+              avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=random`,
+              joinedAt: new Date().toISOString()
+          });
+        }
+        router.push('/dashboard');
+      }
     } catch (err: unknown) { 
       const firebaseError = err as FirebaseError;
-      setError(firebaseError.message.replace('Firebase: ', ''));
+      let msg = firebaseError.message || 'Google authentication failed.';
+      if (msg.includes('auth/popup-closed-by-user')) msg = 'Sign-in window closed.';
+      setError(msg.replace('Firebase: ', ''));
+    } finally {
       setLoading(false);
     }
   };
@@ -203,6 +160,7 @@ const LoginView: React.FC = () => {
         </button>
       </form>
 
+      {/* Social Login Divider */}
       <div className="my-8 flex items-center gap-4">
          <div className="h-px bg-gray-200 dark:bg-zinc-800 flex-1"></div>
          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Or continue with</span>
@@ -212,7 +170,7 @@ const LoginView: React.FC = () => {
       <SocialLogin onClick={handleGoogleLogin} />
 
       <div className="text-center text-sm text-gray-500 mt-8">
-         Don&apos;t have an account? <a href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</a>
+         Don&apos;t have an account? <Link href="/signup" className="text-rose-600 font-bold hover:underline">Create Account</Link>
       </div>
     </AuthLayout>
   );
