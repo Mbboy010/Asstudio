@@ -57,7 +57,7 @@ export async function generateMetadata(
   }
 
   const productName = product.name || 'Premium Audio Tool';
-  const title = `${productName} | Asstudio`;
+  const title = `${productName}`;
   const description = stripHtml(
     product.description || 'Download premium audio tools, sample packs, and VST presets on Asstudio.'
   );

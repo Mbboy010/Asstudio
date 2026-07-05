@@ -59,7 +59,7 @@ const LoginView: React.FC = () => {
       const provider = new GoogleAuthProvider();
       // Using Popup ensures the authentication happens entirely within a safe browser window layer
       const result = await signInWithPopup(auth, provider);
-      
+
       if (result) {
         const user = result.user;
         const docRef = doc(db, "users", user.uid);
@@ -92,7 +92,7 @@ const LoginView: React.FC = () => {
 
   return (
     <AuthLayout title="Welcome Back" subtitle="Enter your credentials to access your studio">
-      
+
       {error && (
         <div className="bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm mb-6 border border-red-100 dark:border-red-900/20 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
@@ -146,7 +146,7 @@ const LoginView: React.FC = () => {
             </button>
           </div>
         </div>
-        
+
         <button 
             disabled={loading} 
             type="submit" 
