@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Wallet, CreditCard, User, Check, Loader } from 'lucide-react';
-import { collection, query, updateDoc, doc, onSnapshot } from 'firebase/firestore';
+import { Search, Wallet, CreditCard, User, Check, Loader, Plus, X } from 'lucide-react';
+import { collection, query, updateDoc, doc, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 interface AdminUser {
@@ -19,6 +19,8 @@ const AdminManageView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Tracks which users have the input box visible
+  const [visibleInputs, setVisibleInputs] = useState<{ [userId: string]: boolean }>({});
   // Tracks editing balance values locally before saving
   const [editingBalances, setEditingBalances] = useState<{ [userId: string]: string }>({});
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
@@ -56,33 +58,61 @@ const AdminManageView: React.FC = () => {
     setEditingBalances(prev => ({ ...prev, [userId]: value }));
   };
 
-  // Persist updated balance to Firestore
-  const handleUpdateBalance = async (userId: string) => {
-    const updatedValue = editingBalances[userId];
+  // Toggle input layout visibility
+  const toggleInputVisibility = (userId: string) => {
+    setVisibleInputs(prev => ({ ...prev, [userId]: !prev[userId] }));
+    // Reset local editing state if closed
+    setEditingBalances(prev => {
+      const copy = { ...prev };
+      delete copy[userId];
+      return copy;
+    });
+  };
+
+  // Persist updated balance to Firestore & log tracking history
+  const handleUpdateBalance = async (user: AdminUser) => {
+    const updatedValue = editingBalances[user.id];
     if (updatedValue === undefined || updatedValue.trim() === '') return;
 
-    const parsedBalance = parseFloat(updatedValue);
-    if (isNaN(parsedBalance)) {
-      alert("Please enter a valid numeric value.");
+    const parsedAmount = parseFloat(updatedValue);
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      alert("Please enter a valid positive numeric value.");
       return;
     }
 
-    setUpdatingUserId(userId);
+    setUpdatingUserId(user.id);
     try {
-      const userRef = doc(db, "users", userId);
-      // Updated field key to match 'balance' from schema image
+      const currentBalance = user.balance ?? 0;
+      const newBalance = currentBalance + parsedAmount;
+
+      const userRef = doc(db, "users", user.id);
+      
+      // 1. Update user balance in their core profile
       await updateDoc(userRef, {
-        balance: parsedBalance
+        balance: newBalance
+      });
+
+      // 2. Add dynamic entry to global transaction collection for user dashboards
+      await addDoc(collection(db, "transactions"), {
+        userId: user.id,
+        userEmail: user.email || 'No email payload',
+        userName: user.name || 'Unnamed Profile',
+        amount: parsedAmount,
+        type: 'credit',
+        description: 'Funds added by administrator',
+        status: 'completed',
+        createdAt: serverTimestamp()
       });
       
-      // Clear editing input state on success
+      // Clear UI layouts state on success
       setEditingBalances(prev => {
         const copy = { ...prev };
-        delete copy[userId];
+        delete copy[user.id];
         return copy;
       });
+      setVisibleInputs(prev => ({ ...prev, [user.id]: false }));
     } catch (err) {
-      console.error("Failed to update user balance:", err);
+      console.error("Failed to update user balance layout:", err);
       alert("Error updating database.");
     } finally {
       setUpdatingUserId(null);
@@ -145,8 +175,9 @@ const AdminManageView: React.FC = () => {
                   </td>
                 </tr>
               ) : filteredUsers.map((user) => {
-                const isEditing = editingBalances[user.id] !== undefined;
-                const currentInputValue = editingBalances[user.id] ?? user.balance?.toString() ?? '0';
+                const showInput = visibleInputs[user.id] || false;
+                const currentInputValue = editingBalances[user.id] ?? '';
+                const hasValue = currentInputValue.trim() !== '';
 
                 return (
                   <tr key={user.id} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
@@ -194,36 +225,54 @@ const AdminManageView: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Inline Modifier Form Input */}
+                    {/* Action form setup changes */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400">₦</span>
-                          <input 
-                            type="number" 
-                            step="any"
-                            placeholder="0.00"
-                            className="pl-6 pr-2 py-1.5 w-32 text-right text-xs font-mono bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-rose-500 transition-colors text-zinc-900 dark:text-white"
-                            value={currentInputValue}
-                            onChange={(e) => handleBalanceChange(user.id, e.target.value)}
-                          />
-                        </div>
-                        <button
-                          disabled={!isEditing || updatingUserId === user.id}
-                          onClick={() => handleUpdateBalance(user.id)}
-                          className={`p-2 rounded-lg border transition-all flex items-center justify-center ${
-                            isEditing 
-                              ? 'bg-rose-600 border-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer' 
-                              : 'bg-zinc-100 dark:bg-zinc-800 border-transparent text-zinc-400 opacity-40 cursor-not-allowed'
-                          }`}
-                          title="Save balance configuration"
-                        >
-                          {updatingUserId === user.id ? (
-                            <Loader className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                        {showInput ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-2 duration-150">
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400">₦</span>
+                              <input 
+                                type="number" 
+                                placeholder="Amount to add"
+                                className="pl-6 pr-2 py-1.5 w-32 text-right text-xs font-mono bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-rose-500 transition-colors text-zinc-900 dark:text-white"
+                                value={currentInputValue}
+                                onChange={(e) => handleBalanceChange(user.id, e.target.value)}
+                                autoFocus
+                              />
+                            </div>
+                            <button
+                              disabled={!hasValue || updatingUserId === user.id}
+                              onClick={() => handleUpdateBalance(user)}
+                              className={`p-1.5 rounded-lg border transition-all flex items-center justify-center ${
+                                hasValue 
+                                  ? 'bg-green-600 border-green-600 hover:bg-green-700 text-white shadow-md cursor-pointer' 
+                                  : 'bg-zinc-100 dark:bg-zinc-800 border-transparent text-zinc-400 opacity-40 cursor-not-allowed'
+                              }`}
+                              title="Save and log credit history"
+                            >
+                              {updatingUserId === user.id ? (
+                                <Loader className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => toggleInputVisibility(user.id)}
+                              className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => toggleInputVisibility(user.id)}
+                            className="flex items-center gap-1 text-xs px-3 py-1.5 font-bold rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 transition-all duration-200"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Balance</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import type { Metadata } from "next";
 import { Inter, Fira_Code } from "next/font/google";
 import "./globals.css";
@@ -8,6 +8,9 @@ import { Layout as MainLayout } from "@/components/Layout";
 import { AuthProvider } from "./AuthContext";
 import AuthGuard from "./AuthGuard";
 import { CookieConsent } from "@/components/CookieConsent";
+
+// Import your custom app-wide real-time Firestore analytics tracker
+import AnalyticsTracker from '@/components/AnalyticsTracker';
 
 // 1. Import the official Google Analytics tracker tool for Next.js
 import { GoogleAnalytics } from '@next/third-parties/google';
@@ -19,7 +22,6 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const firaCode = Fira_Code({ subsets: ["latin"], variable: '--font-fira-code' });
 
 export const metadata: Metadata = {
-  // Point to your live custom domain for clean search indexing
   metadataBase: new URL('https://asstudio.com.ng'), 
   
   title: "Asstudio | Next-Gen Music Tools & Sound Packs",
@@ -92,6 +94,11 @@ export default function RootLayout({
            <Providers>
             {/* We wrap the inner content with the existing Layout component for Navbar/Footer */}
             <MainLayout> 
+              {/* Suspense handles Next.js router hook parameters during build times */}
+              <Suspense fallback={null}>
+                <AnalyticsTracker />
+              </Suspense>
+              
               {children}
               <CookieConsent />
             </MainLayout>

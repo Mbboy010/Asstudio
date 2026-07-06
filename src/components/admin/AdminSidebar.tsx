@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, Users, ShoppingBag, Settings, 
   ClipboardList, CloudUpload, Library, MessageSquare, 
-  Activity, X, LucideIcon 
+  Activity, X, CreditCard, LucideIcon 
 } from 'lucide-react';
 
 interface SidebarItemProps {
@@ -92,7 +92,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  icon={Users} 
                  label="Users" 
                  path="/mb/admin/users" 
-                 // Updated: Added optional chaining and fallback check
                  active={pathname ? pathname.includes('/mb/admin/users') : false}
                  onClick={onClose}
                />
@@ -129,6 +128,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
                  onClick={onClose}
                />
                <SidebarItem 
+                 icon={CreditCard} 
+                 label="Transactions" 
+                 path="/mb/admin/transactions" 
+                 active={pathname ? pathname.includes('/mb/admin/transactions') : false}
+                 onClick={onClose}
+               />
+               <SidebarItem 
                  icon={MessageSquare} 
                  label="Reviews" 
                  path="/mb/admin/reviews" 
@@ -147,7 +153,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onClose 
              {/* Footer Info */}
              <div className="p-6 border-t border-gray-100 dark:border-zinc-800">
                 <div className="text-xs text-gray-400 font-medium">
-                   A.S STUDIO Admin<br/>
+                   Asstudio Admin<br/>
                    <span className="opacity-50">v2.0.1</span>
                 </div>
              </div>

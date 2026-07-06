@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, getDocs, startAfter, DocumentSnapshot } from 'firebase/firestore';
+import React, { useEffect, useState, useRef } from 'react';
+import { collection, query, orderBy, limit, startAfter, onSnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { 
-  Activity, Globe, Smartphone, Clock, MapPin, User as UserIcon, 
+  Activity, Globe, Smartphone, Clock, MapPin, User as UserIcon, ShieldAlert,
   RefreshCcw, Monitor, Laptop, Tablet, ChevronLeft, ChevronRight, BarChart 
 } from 'lucide-react';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -17,6 +17,7 @@ interface PageVisit {
   userPhone: string;
   location: string;
   userAgent: string;
+  userId?: string;
 }
 
 const AdminAnalyticsView: React.FC = () => {
@@ -24,13 +25,18 @@ const AdminAnalyticsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [pageStats, setPageStats] = useState<Record<string, number>>({});
   
+  const [authCount, setAuthCount] = useState(0);
+  const [guestCount, setGuestCount] = useState(0);
+
   // Pagination State
   const ITEMS_PER_PAGE = 15;
   const [lastDocs, setLastDocs] = useState<DocumentSnapshot[]>([]); 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Helper to detect device from User Agent
+  // Keep a reference to the active unsubscribe function to clean up listeners safely
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
   const getDeviceInfo = (ua: string) => {
     const lowerUA = (ua || '').toLowerCase();
     if (lowerUA.includes('iphone')) return { name: 'iPhone', icon: Smartphone, color: 'text-rose-600 dark:text-rose-500' };
@@ -43,80 +49,121 @@ const AdminAnalyticsView: React.FC = () => {
     return { name: 'Desktop', icon: Monitor, color: 'text-gray-500' };
   };
 
-  const fetchVisits = async (direction: 'initial' | 'next' | 'prev' = 'initial') => {
+  const setupLiveVisitsListener = (direction: 'initial' | 'next' | 'prev' = 'initial') => {
     setLoading(true);
+    
+    // Kill any existing live listener before creating a new one (prevents duplicate data triggers)
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+    }
+
     try {
-        let q;
-        const visitsRef = collection(db, "page_visits");
+      let q;
+      const visitsRef = collection(db, "page_visits");
 
-        if (direction === 'initial' || direction === 'prev') {
-            if (currentPage === 1) {
-                q = query(visitsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE));
-            } else {
-                const prevCursor = lastDocs[currentPage - 2];
-                q = query(visitsRef, orderBy("timestamp", "desc"), startAfter(prevCursor), limit(ITEMS_PER_PAGE));
-            }
-        } else if (direction === 'next') {
-            const lastVisible = lastDocs[currentPage - 1];
-            q = query(visitsRef, orderBy("timestamp", "desc"), startAfter(lastVisible), limit(ITEMS_PER_PAGE));
+      // Set up real-time queries with buffer limits to handle client-side filtration layout
+      if (direction === 'initial' || direction === 'prev') {
+        if (currentPage === 1) {
+          q = query(visitsRef, orderBy("timestamp", "desc"), limit(ITEMS_PER_PAGE * 2));
+        } else {
+          const prevCursor = lastDocs[currentPage - 2];
+          q = query(visitsRef, orderBy("timestamp", "desc"), startAfter(prevCursor), limit(ITEMS_PER_PAGE * 2));
         }
+      } else if (direction === 'next') {
+        const lastVisible = lastDocs[currentPage - 1];
+        q = query(visitsRef, orderBy("timestamp", "desc"), startAfter(lastVisible), limit(ITEMS_PER_PAGE * 2));
+      }
 
-        if (!q) return;
+      if (!q) return;
 
-        const snapshot = await getDocs(q);
+      // Establish real-time persistent channel with Firestore
+      unsubscribeRef.current = onSnapshot(q, (snapshot) => {
         const fetchedVisits: PageVisit[] = [];
         const stats: Record<string, number> = {}; 
+        
+        let batchAuthCount = 0;
+        let batchGuestCount = 0;
 
         snapshot.forEach((doc) => {
-            const data = doc.data();
-            fetchedVisits.push({
+          const data = doc.data();
+          const name = data.userName || 'Guest';
+          
+          const isGuest = name.toLowerCase() === 'guest' || name.trim() === 'N/A' || !data.userName;
+          
+          if (isGuest) {
+            batchGuestCount++;
+          } else {
+            batchAuthCount++;
+            
+            if (fetchedVisits.length < ITEMS_PER_PAGE) {
+              fetchedVisits.push({
                 id: doc.id,
                 path: data.path,
                 timestamp: data.timestamp,
-                userName: data.userName || 'Guest',
+                userName: name,
                 userPhone: data.userPhone || 'N/A',
                 location: data.location || 'Unknown',
-                userAgent: data.userAgent || ''
-            });
-            const pathKey = data.path;
-            stats[pathKey] = (stats[pathKey] || 0) + 1;
+                userAgent: data.userAgent || '',
+                userId: data.userId
+              });
+              
+              const pathKey = data.path;
+              stats[pathKey] = (stats[pathKey] || 0) + 1;
+            }
+          }
         });
 
         setVisits(fetchedVisits);
         setPageStats(stats);
+        setAuthCount(batchAuthCount);
+        setGuestCount(batchGuestCount);
         
         if (snapshot.docs.length > 0) {
-            const lastVisible = snapshot.docs[snapshot.docs.length - 1];
-            if (direction === 'next') {
-                setLastDocs(prev => [...prev, lastVisible]);
-            } else if (direction === 'initial') {
-                setLastDocs([lastVisible]);
-            }
+          const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+          if (direction === 'next') {
+            setLastDocs(prev => {
+              // Avoid stacking duplicate cursor states if an item is added to the database live
+              if (prev.some(d => d.id === lastVisible.id)) return prev;
+              return [...prev, lastVisible];
+            });
+          } else if (direction === 'initial') {
+            setLastDocs([lastVisible]);
+          }
         }
         
-        setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
+        setHasMore(snapshot.docs.length >= ITEMS_PER_PAGE && fetchedVisits.length === ITEMS_PER_PAGE);
+        setLoading(false);
+      }, (error) => {
+        console.error("Error with real-time analytics sync stream:", error);
+        setLoading(false);
+      });
 
     } catch (error) {
-        console.error("Error fetching analytics:", error);
-    } finally {
-        setLoading(false);
+      console.error("Error setting up subscription channels:", error);
+      setLoading(false);
     }
   };
 
+  // Re-run listener initialization every time pagination states shift direction
   useEffect(() => {
-    fetchVisits('initial');
+    setupLiveVisitsListener(currentPage === 1 ? 'initial' : 'next');
+  }, [currentPage]);
+
+  // Clean up channel allocations whenever component unmounts
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef.current) unsubscribeRef.current();
+    };
   }, []);
 
   const handleNext = () => {
     if (!hasMore) return;
     setCurrentPage(prev => prev + 1);
-    fetchVisits('next');
   };
 
   const handlePrev = () => {
     if (currentPage === 1) return;
     setCurrentPage(prev => prev - 1);
-    fetchVisits('prev');
   };
 
   const sortedStats = Object.entries(pageStats)
@@ -130,17 +177,41 @@ const AdminAnalyticsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 border-b border-gray-200 dark:border-zinc-800 pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-             <span className="text-rose-600 font-bold text-xs uppercase tracking-wider bg-rose-50 dark:bg-rose-900/10 px-2 py-1 rounded">Insights</span>
+             <span className="text-rose-600 font-bold text-xs uppercase tracking-wider bg-rose-50 dark:bg-rose-900/10 px-2 py-1 rounded flex items-center gap-1.5">
+               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" /> Live Streaming
+             </span>
           </div>
-          <h1 className="text-3xl font-black text-gray-900 dark:text-white">Traffic Analytics</h1>
-          <p className="text-gray-500 font-medium mt-1">Monitor real-time user activity and demographics.</p>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">User Traffic Logs</h1>
+          <p className="text-gray-500 font-medium mt-1">Exclusively monitoring active authenticated client interactions on Asstudio.</p>
         </div>
         <button 
-            onClick={() => { setCurrentPage(1); setLastDocs([]); fetchVisits('initial'); }} 
+            onClick={() => { setCurrentPage(1); setLastDocs([]); setupLiveVisitsListener('initial'); }} 
             className="p-2.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-rose-600 transition-colors flex items-center gap-2 text-sm font-bold shadow-sm"
         >
-            <RefreshCcw className="w-4 h-4" /> Refresh Data
+            <RefreshCcw className="w-4 h-4" /> Reset Stream
         </button>
+      </div>
+
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-950/20 text-green-600">
+            <UserIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Authenticated Sessions</div>
+            <div className="text-xl font-black text-gray-900 dark:text-white">{authCount} Captured</div>
+          </div>
+        </div>
+        <div className="p-5 rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 text-amber-600">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Anonymous Guests Blocked</div>
+            <div className="text-xl font-black text-gray-900 dark:text-white">{guestCount} Omitted</div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -148,7 +219,7 @@ const AdminAnalyticsView: React.FC = () => {
          {/* Top Pages Card */}
          <div className="lg:col-span-1 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 p-6 shadow-sm h-fit">
             <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
-                <Activity className="w-5 h-5 text-rose-600" /> Trending Pages
+                <Activity className="w-5 h-5 text-rose-600" /> Member Hub Trends
             </h3>
             <div className="space-y-3">
                 {sortedStats.length > 0 ? (
@@ -168,7 +239,7 @@ const AdminAnalyticsView: React.FC = () => {
                 ) : (
                     <div className="text-center text-gray-500 py-10 flex flex-col items-center">
                         <BarChart className="w-8 h-8 opacity-20 mb-2" />
-                        No trend data available
+                        No authenticated trends.
                     </div>
                 )}
             </div>
@@ -178,7 +249,7 @@ const AdminAnalyticsView: React.FC = () => {
          <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col">
              <div className="p-6 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-900">
                 <h3 className="font-bold text-lg flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Globe className="w-5 h-5 text-rose-600" /> Visit Log
+                    <Globe className="w-5 h-5 text-rose-600" /> Member Access Logs
                 </h3>
                 <span className="px-3 py-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full text-xs font-bold text-gray-500">
                     Page {currentPage}
@@ -191,7 +262,7 @@ const AdminAnalyticsView: React.FC = () => {
                         <thead className="bg-gray-50 dark:bg-zinc-800/50 text-gray-500 uppercase text-xs border-b border-gray-200 dark:border-zinc-800">
                             <tr>
                                 <th className="px-6 py-4 font-bold tracking-wider">Page Path</th>
-                                <th className="px-6 py-4 font-bold tracking-wider">Visitor</th>
+                                <th className="px-6 py-4 font-bold tracking-wider">User Identity</th>
                                 <th className="px-6 py-4 font-bold tracking-wider">Device</th>
                                 <th className="px-6 py-4 font-bold tracking-wider">Location</th>
                                 <th className="px-6 py-4 font-bold tracking-wider">Time</th>
@@ -206,11 +277,14 @@ const AdminAnalyticsView: React.FC = () => {
                                             {visit.path}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-400 group-hover:bg-rose-100 group-hover:text-rose-600 transition-colors">
-                                                    <UserIcon className="w-3 h-3" />
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+                                                        <UserIcon className="w-2.5 h-2.5" />
+                                                    </div>
+                                                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{visit.userName}</span>
                                                 </div>
-                                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{visit.userName}</span>
+                                                <span className="text-[10px] text-gray-400 font-mono pl-7 mt-0.5">{visit.userPhone}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -234,8 +308,8 @@ const AdminAnalyticsView: React.FC = () => {
                             })}
                             {visits.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                                        No visit records found for this period.
+                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium">
+                                        No verified user operations streamed yet.
                                     </td>
                                 </tr>
                             )}
@@ -255,7 +329,7 @@ const AdminAnalyticsView: React.FC = () => {
                 </button>
                 
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {visits.length} Records Shown
+                    {visits.length} Live Tracks
                 </span>
                 
                 <button 
