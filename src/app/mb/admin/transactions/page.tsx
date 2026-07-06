@@ -17,7 +17,7 @@ interface TransactionRecord {
   type: 'credit' | 'debit';
   description?: string;
   status: 'completed' | 'pending' | 'failed';
-  createdAt: any;
+  createdAt: Date; // Explicitly typed as Date instead of any
 }
 
 export default function AdminTransactionsPage() {
@@ -36,7 +36,7 @@ export default function AdminTransactionsPage() {
         return {
           id: doc.id,
           ...data,
-          // Format timestamp safely if it hasn't synced from server yet
+          // Safely resolve to a Date object
           createdAt: data.createdAt?.toDate() ? data.createdAt.toDate() : new Date()
         } as TransactionRecord;
       });
