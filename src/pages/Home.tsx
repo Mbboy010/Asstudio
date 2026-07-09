@@ -11,6 +11,7 @@ import { ProductCategory, Product } from '@/types';
 import { HeroSkeleton } from '@/components/ui/Skeleton';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
 // --- Animation Variants ---
 const fadeInUp = {
@@ -28,6 +29,7 @@ const staggerContainer = {
 
 const HomeContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   
   // Data State
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
@@ -76,43 +78,49 @@ const HomeContent: React.FC = () => {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-300">
       
       {/* --- HERO SECTION --- */}
-      <section  className="relative h-[60vh] flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-black">
+      <section className="relative min-h-[67vh] lg:h-[70vh] flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-black py-16 md:py-0">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-white dark:hidden"></div>
           <div className="absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-900/20 via-black to-black"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-500/10 dark:bg-rose-600/10 rounded-full blur-[100px] animate-pulse"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-rose-500/10 dark:bg-rose-600/10 rounded-full blur-[80px] sm:blur-[100px] animate-pulse"></div>
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
         </div>
 
-        <div className="relative z-10 container mx-auto px-4 text-center">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex flex-col items-center">
-            <motion.div variants={fadeInUp} className="mb-8 relative group">
+            
+            {/* Branding Core Logo Badge */}
+            <motion.div variants={fadeInUp} className="mb-6 md:mb-8 relative group">
                 <div className="absolute -inset-4 bg-rose-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div className="relative w-28 h-28 md:w-36 md:h-36 rounded-full border-4 border-white dark:border-rose-500/50 flex items-center justify-center bg-white dark:bg-black shadow-2xl dark:shadow-[0_0_30px_rgba(225,29,72,0.3)]">
+                <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-36 md:h-36 rounded-full border-4 border-white dark:border-rose-500/50 flex items-center justify-center bg-white dark:bg-black shadow-2xl dark:shadow-[0_0_30px_rgba(225,29,72,0.3)]">
                    <h1 className="font-black text-rose-600 dark:text-rose-500 text-center leading-none">
-                     <span className="text-2xl md:text-3xl block">A.S</span>
-                     <span className="text-xs md:text-sm tracking-widest text-black dark:text-white">STUDIO</span>
+                     <span className="text-xl sm:text-2xl md:text-3xl block">A.S</span>
+                     <span className="text-[10px] sm:text-xs md:text-sm tracking-widest text-black dark:text-white">STUDIO</span>
                    </h1>
                 </div>
             </motion.div>
 
-            <motion.h1 variants={fadeInUp} className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight mb-4 text-gray-900 dark:text-white">
+            {/* Typography Heading Setup */}
+            <motion.h1 variants={fadeInUp} className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-4 text-gray-900 dark:text-white leading-[1.1]">
               DIGITAL <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-orange-500">MASTERY</span>
             </motion.h1>
 
-            <motion.p variants={fadeInUp} className="text-gray-600 dark:text-gray-400 text-base md:text-lg max-w-2xl mb-8 leading-relaxed">
+            {/* Paragraph Subtitle Description */}
+            <motion.p variants={fadeInUp} className="text-gray-600 dark:text-gray-400 text-sm sm:text-base md:text-lg max-w-xl md:max-w-2xl mb-8 px-2 sm:px-0 leading-relaxed">
               Premium VST plugins, mobile applications, and sound libraries. 
               Engineered for the next generation of creators.
             </motion.p>
 
-            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center">
-              <Link href="/shop" className="px-6 py-3 md:px-8 md:py-4 bg-rose-600 text-white font-bold rounded-full hover:bg-rose-700 transition-all hover:scale-105 shadow-lg shadow-rose-500/20">
+            {/* UI Action Trigger Buttons */}
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3.5 sm:gap-4 w-full sm:w-auto max-w-xs sm:max-w-none justify-center">
+              <Link href="/shop" className="px-6 py-3.5 md:px-8 md:py-4 bg-rose-600 text-white font-bold rounded-full hover:bg-rose-700 transition-all hover:scale-105 shadow-lg shadow-rose-500/20 text-sm md:text-base text-center">
                   Browse Catalog
               </Link>
-              <Link href="https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk" target="_blank" className="px-6 py-3 md:px-8 md:py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors">
+              <Link href="https://youtube.com/@a.s_studio?si=6ZpTXPcWRTyMayzk" target="_blank" className="px-6 py-3.5 md:px-8 md:py-4 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white font-bold rounded-full hover:border-rose-500 dark:hover:border-rose-500 hover:text-rose-500 transition-colors text-sm md:text-base text-center">
                 A.S STUDIO YouTube
               </Link>
             </motion.div>
+
           </motion.div>
         </div>
       </section>
@@ -243,6 +251,7 @@ const HomeContent: React.FC = () => {
                {latestPlugins.map((plugin, idx) => (
                   <motion.div 
                     key={plugin.id}
+                    onClick={() => router.push(`/product/${plugin.id}`)}
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
@@ -325,6 +334,7 @@ const HomeContent: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                {samplePacks.length > 0 ? samplePacks.map((pack, idx) => (
                   <motion.div 
+                    onClick={() => router.push(`/product/${pack.id}`)}
                      key={pack.id}
                      initial={{ opacity: 0, x: -20 }}
                      whileInView={{ opacity: 1, x: 0 }}
@@ -337,7 +347,7 @@ const HomeContent: React.FC = () => {
                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-rose-500 transition-colors truncate">{pack.name}</h4>
                         <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{pack.category || 'High quality WAV samples.'}</div>
-                        <Link href={`/product/${pack.id}`} className="text-[11px] font-bold text-rose-500 hover:underline mt-0.5 inline-block">View Pack</Link>
+                  <Link href={`/product/${pack.id}`} className="text-[11px] font-bold text-rose-500 hover:underline mt-0.5 inline-block">View Pack</Link>
                      </div>
                      <div className="text-right shrink-0">
                         <div className="font-mono font-bold text-xs md:text-sm text-gray-900 dark:text-white">{pack.price === 0 ? 'FREE' : `₦${pack.price}`}</div>
