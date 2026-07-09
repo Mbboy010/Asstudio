@@ -100,7 +100,7 @@ const HomeContent: React.FC = () => {
                 </div>
             </motion.div>
 
-            {/* Typography Heading Setup */}
+            {/* Typography Heading Setup  */}
             <motion.h1 variants={fadeInUp} className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-4 text-gray-900 dark:text-white leading-[1.1]">
               DIGITAL <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-orange-500">MASTERY</span>
             </motion.h1>
