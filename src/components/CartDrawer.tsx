@@ -240,7 +240,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       });
 
       onClose();
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
+      
     } catch (error) {
       console.error("Checkout Error:", error);
       setIsCheckingOut(false);
