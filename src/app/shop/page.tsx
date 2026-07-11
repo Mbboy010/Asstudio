@@ -25,7 +25,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   } else if (searchTerm) {
     title = `Results for "${searchTerm}" | Asstudio`;
   } else if (category) {
-    title = `Browse ${category} | Asstudio`;
+    title = `${category} | Asstudio`;
   }
 
   const description = category 

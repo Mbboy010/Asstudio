@@ -32,6 +32,9 @@ const ShopContent: React.FC<ShopClientProps> = ({
 }) => {
   const router = useRouter();
 
+  // Normalize fallback context to ensure "All" behaves consistently if parameters are empty
+  const activeCategory = !initialCategory || initialCategory === 'undefined' ? 'All' : initialCategory;
+
   // --- Custom Alert State ---
   const [alertConfig, setAlertConfig] = useState({ 
     show: false, 
@@ -67,13 +70,13 @@ const ShopContent: React.FC<ShopClientProps> = ({
       if (localSearchTerm !== initialSearch) {
         const params = new URLSearchParams();
         if (localSearchTerm) params.set('q', localSearchTerm);
-        if (initialCategory && initialCategory !== 'All') params.set('category', initialCategory);
+        if (activeCategory && activeCategory !== 'All') params.set('category', activeCategory);
         
         router.replace(`/shop?${params.toString()}`);
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [localSearchTerm, initialSearch, initialCategory, router]);
+  }, [localSearchTerm, initialSearch, activeCategory, router]);
 
   // Auth Listener
   useEffect(() => {
@@ -207,7 +210,7 @@ const ShopContent: React.FC<ShopClientProps> = ({
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(initialSearch.toLowerCase());
-    const matchesCategory = initialCategory === 'All' || p.category === initialCategory;
+    const matchesCategory = activeCategory === 'All' || p.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -219,7 +222,7 @@ const ShopContent: React.FC<ShopClientProps> = ({
   const handlePageChange = (pageNumber: number) => {
     const params = new URLSearchParams();
     if (initialSearch) params.set('q', initialSearch);
-    if (initialCategory && initialCategory !== 'All') params.set('category', initialCategory);
+    if (activeCategory && activeCategory !== 'All') params.set('category', activeCategory);
     if (pageNumber > 1) params.set('page', pageNumber.toString());
 
     router.push(`/shop?${params.toString()}`);
@@ -264,7 +267,7 @@ const ShopContent: React.FC<ShopClientProps> = ({
                  key={cat}
                  onClick={() => handleCategoryChange(cat)}
                  className={`px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                   initialCategory === cat 
+                   activeCategory === cat 
                    ? 'bg-rose-600 text-white shadow-lg' 
                    : 'bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-zinc-800 hover:text-gray-900 dark:hover:text-white'
                  }`}
@@ -277,7 +280,8 @@ const ShopContent: React.FC<ShopClientProps> = ({
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 min-h-[600px]">
+      {/* Added `items-start` layout wrapper to fix uneven card stretch stretching out UI components */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 min-h-[600px] items-start">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
         ) : currentItems.length > 0 ? (
@@ -285,7 +289,7 @@ const ShopContent: React.FC<ShopClientProps> = ({
             // Embed state logic inside Link tags for direct fallback target handling
             const detailUrlParams = new URLSearchParams();
             if (initialSearch) detailUrlParams.set('q', initialSearch);
-            if (initialCategory && initialCategory !== 'All') detailUrlParams.set('category', initialCategory);
+            if (activeCategory && activeCategory !== 'All') detailUrlParams.set('category', activeCategory);
             if (currentPage > 1) detailUrlParams.set('page', currentPage.toString());
             const productHref = `/product/${product.id}?${detailUrlParams.toString()}`;
 
@@ -295,14 +299,14 @@ const ShopContent: React.FC<ShopClientProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: false }}
-                className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col p-3 sm:p-4"
+                className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col p-3 sm:p-4 min-h-[290px] justify-between h-full"
               >
                 <Link href={productHref} className="relative aspect-square w-full overflow-hidden bg-gray-100 dark:bg-zinc-800/50 rounded-xl block cursor-pointer p-4 flex items-center justify-center">
                   {product.image ? (
                      <img 
                       src={product.image} 
                       alt={product.name}
-                      className="object-contain max-w-full max-h-full rounded-md group-hover:scale-102 transition-transform duration-500" 
+                      className="object-contain max-w-full max-h-full rounded-md group-hover:scale-105 transition-transform duration-500" 
                      />
                   ) : (
                      <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
@@ -323,14 +327,14 @@ const ShopContent: React.FC<ShopClientProps> = ({
                   </div>
                 </Link>
 
-                <div className="pt-4 flex flex-col flex-grow">
-                  <Link href={productHref} className="hover:text-rose-500 transition-colors block mb-3">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base line-clamp-1">
+                <div className="pt-4 flex flex-col flex-grow justify-between">
+                  <Link href={productHref} className="hover:text-rose-500 transition-colors block mb-2">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base line-clamp-2 leading-snug">
                       {product.name}
                     </h3>
                   </Link>
 
-                  <div className="mt-auto flex justify-between items-center text-sm font-bold">
+                  <div className="mt-2 flex justify-between items-center text-sm font-bold pt-2 border-t border-gray-100 dark:border-zinc-800/50">
                      <span className="text-rose-600 dark:text-rose-500 tracking-wide font-mono">
                         {product.price === 0 ? 'FREE' : `₦${product.price}`}
                      </span>
