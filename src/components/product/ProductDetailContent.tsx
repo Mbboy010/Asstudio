@@ -67,6 +67,9 @@ const ProductDetail: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
+  
+  // Track continuous back-navigation context parameters safely
+  const [backToCatalogUrl, setBackToCatalogUrl] = useState('/shop');
 
   // --- Audio State ---
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -83,8 +86,23 @@ const ProductDetail: React.FC = () => {
 
   const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setAlertConfig({ show: true, message, type });
-    
   };
+
+  // --- Preserve Back History Pagination Links Context ---
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const referrer = document.referrer;
+      // If user navigated directly inside from an active sorted route, preserve its query params
+      if (referrer.includes('/shop')) {
+        try {
+          const urlObj = new URL(referrer);
+          setBackToCatalogUrl(`/shop${urlObj.search}`);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
 
   // --- Auth Listener ---
   useEffect(() => {
@@ -235,7 +253,6 @@ const ProductDetail: React.FC = () => {
   };
 
   const handleDownload = async (isDemo: boolean = false) => {
-    // 1. Determine if we can bypass auth
     const isFree = product?.price === 0;
     const needsAuth = !isDemo && !isFree;
 
@@ -247,8 +264,6 @@ const ProductDetail: React.FC = () => {
     setIsDownloading(true);
     
     try {
-      // 2. Optional: Record free order only if user is logged in
-      // Guests can still download, but we don't try to write to Firestore for them
       if (!isDemo && isFree && currentUser && product) {
         try {
           await addDoc(collection(db, "orders"), {
@@ -260,11 +275,9 @@ const ProductDetail: React.FC = () => {
           });
         } catch (e) {
           console.error("Background order recording failed:", e);
-          // We don't 'return' here because we want them to get the file anyway
         }
       }
 
-      // 3. Trigger Download
       if (isDemo && product?.demoUrl) {
         window.open(product.demoUrl, '_blank');
       } else if (!isDemo && product?.productUrl) {
@@ -358,7 +371,8 @@ const ProductDetail: React.FC = () => {
         onClose={() => setSelectedScreenshot(null)} 
       />
 
-      <Link href="/shop" className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">  
+      {/* Dynamic preserved catalog string context mapping */}
+      <Link href={backToCatalogUrl} className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">  
          <ArrowLeft className="w-4 h-4" /> Back to Catalog  
       </Link>  
         
@@ -411,7 +425,6 @@ const ProductDetail: React.FC = () => {
       <AnimatePresence>
         {alertConfig.show && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-            {/* Backdrop Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -420,14 +433,12 @@ const ProductDetail: React.FC = () => {
               onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
             />
             
-            {/* Modal Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-sm flex flex-col items-center text-center gap-3 p-8 rounded-3xl shadow-2xl border bg-white dark:bg-zinc-900 border-gray-100 dark:border-zinc-800"
             >
-              {/* Close Button (Top Right) */}
               <button 
                 onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))} 
                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -435,7 +446,6 @@ const ProductDetail: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Centered Icon */}
               <div className={`p-4 rounded-full mb-2 ${
                 alertConfig.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
                 alertConfig.type === 'error' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
@@ -446,7 +456,6 @@ const ProductDetail: React.FC = () => {
                 {alertConfig.type === 'info' && <Info className="w-10 h-10" />}
               </div>
               
-              {/* Text Content */}
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 {alertConfig.type === 'success' ? 'Success!' : alertConfig.type === 'error' ? 'Oops!' : 'Notice'}
               </h3>
@@ -454,7 +463,6 @@ const ProductDetail: React.FC = () => {
                 {alertConfig.message}
               </p>
               
-              {/* Action Button */}
               <button 
                 onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
                 className={`w-full py-3 rounded-xl font-semibold transition-colors ${
