@@ -50,17 +50,7 @@ export interface Review {
   isLiked?: boolean;
 }
 
-export interface ShopClientProps {
-  initialSearch?: string;
-  initialCategory?: string;
-  initialPage?: number;
-}
-
-const ProductDetail: React.FC<ShopClientProps> = ({ 
-  initialSearch = '', 
-  initialCategory = '', 
-  initialPage = 1 
-}) => {
+const ProductDetail: React.FC = () => {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
@@ -77,6 +67,9 @@ const ProductDetail: React.FC<ShopClientProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
+  
+  // Track continuous back-navigation context parameters safely
+  const [backToCatalogUrl, setBackToCatalogUrl] = useState('/shop');
 
   // --- Audio State ---
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -94,6 +87,22 @@ const ProductDetail: React.FC<ShopClientProps> = ({
   const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setAlertConfig({ show: true, message, type });
   };
+
+  // --- Preserve Back History Pagination Links Context ---
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const referrer = document.referrer;
+      // If user navigated directly inside from an active sorted route, preserve its query params
+      if (referrer.includes('/shop')) {
+        try {
+          const urlObj = new URL(referrer);
+          setBackToCatalogUrl(`/shop${urlObj.search}`);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
 
   // --- Auth Listener ---
   useEffect(() => {
@@ -352,15 +361,6 @@ const ProductDetail: React.FC<ShopClientProps> = ({
     }
   };
 
-  // --- Build Dynamic Safe Back Link ---
-  const buildBackUrl = () => {
-    const segments: string[] = [];
-    if (initialCategory) segments.push(`category=${encodeURIComponent(initialCategory)}`);
-    if (initialSearch) segments.push(`q=${encodeURIComponent(initialSearch)}`);
-    if (initialPage > 1) segments.push(`page=${initialPage}`);
-    return segments.length > 0 ? `/shop?${segments.join('&')}` : '/shop';
-  };
-
   if (loading || !product) return <DetailSkeleton />;
 
   return (
@@ -371,7 +371,8 @@ const ProductDetail: React.FC<ShopClientProps> = ({
         onClose={() => setSelectedScreenshot(null)} 
       />
 
-      <Link href={buildBackUrl()} className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">  
+      {/* Dynamic preserved catalog string context mapping */}
+      <Link href={backToCatalogUrl} className="inline-flex items-center gap-2 text-gray-500 hover:text-rose-600 mb-8 transition-colors group">  
          <ArrowLeft className="w-4 h-4" /> Back to Catalog  
       </Link>  
         
@@ -481,10 +482,10 @@ const ProductDetail: React.FC<ShopClientProps> = ({
   );
 };
 
-export default function Shop(props: ShopClientProps) {
+export default function ProductDetailContent() {
   return (
     <Suspense fallback={<DetailSkeleton />}>
-      <ProductDetail {...props} />
+      <ProductDetail />
     </Suspense>
   );
 }

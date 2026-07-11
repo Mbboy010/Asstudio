@@ -7,7 +7,7 @@ import { Product, ProductCategory } from '@/types';
 import { ProductSkeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { collection, getDocs, query, orderBy, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '@/firebase';
 import { sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
@@ -19,9 +19,18 @@ interface DownloadableProduct extends Product {
   productUrl?: string;
 }
 
-const ShopContent: React.FC = () => {
+export interface ShopClientProps {
+  initialSearch?: string;
+  initialCategory?: string;
+  initialPage?: number;
+}
+
+const ShopContent: React.FC<ShopClientProps> = ({
+  initialSearch = '',
+  initialCategory = 'All',
+  initialPage = 1
+}) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // --- Custom Alert State ---
   const [alertConfig, setAlertConfig] = useState({ 
@@ -35,13 +44,36 @@ const ShopContent: React.FC = () => {
   };
 
   const [loading, setLoading] = useState(true);
-  const selectedCategory = searchParams?.get('category') ?? 'All';
-  const urlSearchTerm = searchParams?.get('search') ?? '';
-
-  const [localSearchTerm, setLocalSearchTerm] = useState(urlSearchTerm);
+  const [localSearchTerm, setLocalSearchTerm] = useState(initialSearch);
   const [products, setProducts] = useState<Product[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // Sync internal page state whenever the URL route configuration refreshes on page props mutation
+  const [currentPage, setCurrentPage] = useState(initialPage);
+
+  // Ensure current page state drops down safely back to 1 if params undergo manual reconfiguration
+  useEffect(() => {
+    setCurrentPage(initialPage);
+  }, [initialPage]);
+
+  // Sync state cleanly if dynamic server properties shift over navigation loops
+  useEffect(() => {
+    setLocalSearchTerm(initialSearch);
+  }, [initialSearch]);
+
+  // Debounce User Text Input Actions Back To Server Router Pipeline
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearchTerm !== initialSearch) {
+        const params = new URLSearchParams();
+        if (localSearchTerm) params.set('q', localSearchTerm);
+        if (initialCategory && initialCategory !== 'All') params.set('category', initialCategory);
+        
+        router.replace(`/shop?${params.toString()}`);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearchTerm, initialSearch, initialCategory, router]);
 
   // Auth Listener
   useEffect(() => {
@@ -50,25 +82,6 @@ const ShopContent: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    setLocalSearchTerm(urlSearchTerm);
-  }, [urlSearchTerm]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (localSearchTerm !== urlSearchTerm) {
-        const params = new URLSearchParams(searchParams?.toString() ?? '');
-        if (localSearchTerm) {
-          params.set('search', localSearchTerm);
-        } else {
-          params.delete('search');
-        }
-        router.replace(`/shop?${params.toString()}`);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [localSearchTerm, searchParams, router, urlSearchTerm]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -185,18 +198,16 @@ const ShopContent: React.FC = () => {
   };
 
   const handleCategoryChange = (cat: string) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? '');
-      if (cat === 'All') {
-          params.delete('category');
-      } else {
-          params.set('category', cat);
-      }
+      const params = new URLSearchParams();
+      if (localSearchTerm) params.set('q', localSearchTerm);
+      if (cat !== 'All') params.set('category', cat);
+      
       router.push(`/shop?${params.toString()}`);
   };
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(urlSearchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesSearch = p.name.toLowerCase().includes(initialSearch.toLowerCase());
+    const matchesCategory = initialCategory === 'All' || p.category === initialCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -205,18 +216,19 @@ const ShopContent: React.FC = () => {
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
   const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [urlSearchTerm, selectedCategory]);
-
   const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
+    const params = new URLSearchParams();
+    if (initialSearch) params.set('q', initialSearch);
+    if (initialCategory && initialCategory !== 'All') params.set('category', initialCategory);
+    if (pageNumber > 1) params.set('page', pageNumber.toString());
+
+    router.push(`/shop?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleResetFilters = () => {
-    router.push('/shop');
     setLocalSearchTerm('');
+    router.push('/shop');
     fetchProducts();
   };
 
@@ -252,7 +264,7 @@ const ShopContent: React.FC = () => {
                  key={cat}
                  onClick={() => handleCategoryChange(cat)}
                  className={`px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
-                   selectedCategory === cat 
+                   initialCategory === cat 
                    ? 'bg-rose-600 text-white shadow-lg' 
                    : 'bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-zinc-800 hover:text-gray-900 dark:hover:text-white'
                  }`}
@@ -265,68 +277,72 @@ const ShopContent: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Product Display Grid formatted exactly like 1000632389.jpg */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 min-h-[600px]">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
         ) : currentItems.length > 0 ? (
-          currentItems.map((product) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false }}
-              className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col p-3 sm:p-4"
-            >
-              {/* Image Frame Wrapper with internal padding matching 1000632389.jpg */}
-              <Link href={`/product/${product.id}`} className="relative aspect-square w-full overflow-hidden bg-gray-100 dark:bg-zinc-800/50 rounded-xl block cursor-pointer p-4 flex items-center justify-center">
-                {product.image ? (
-                   <img 
-                    src={product.image} 
-                    alt={product.name}
-                    className="object-contain max-w-full max-h-full rounded-md group-hover:scale-102 transition-transform duration-500" 
-                   />
-                ) : (
-                   <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
-                      <ImageIcon className="w-10 h-10 opacity-40" />
-                   </div>
-                )}
+          currentItems.map((product) => {
+            // Embed state logic inside Link tags for direct fallback target handling
+            const detailUrlParams = new URLSearchParams();
+            if (initialSearch) detailUrlParams.set('q', initialSearch);
+            if (initialCategory && initialCategory !== 'All') detailUrlParams.set('category', initialCategory);
+            if (currentPage > 1) detailUrlParams.set('page', currentPage.toString());
+            const productHref = `/product/${product.id}?${detailUrlParams.toString()}`;
 
-                {/* Category Pill Tag */}
-                <div className="absolute top-2 left-2 z-10">
-                  <div className="bg-black/75 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                    {product.category === ProductCategory.VST_PLUGIN ? 'VST Plugin' : 'Sample Pack'}
+            return (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col p-3 sm:p-4"
+              >
+                <Link href={productHref} className="relative aspect-square w-full overflow-hidden bg-gray-100 dark:bg-zinc-800/50 rounded-xl block cursor-pointer p-4 flex items-center justify-center">
+                  {product.image ? (
+                     <img 
+                      src={product.image} 
+                      alt={product.name}
+                      className="object-contain max-w-full max-h-full rounded-md group-hover:scale-102 transition-transform duration-500" 
+                     />
+                  ) : (
+                     <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50 dark:bg-zinc-800">
+                        <ImageIcon className="w-10 h-10 opacity-40" />
+                     </div>
+                  )}
+
+                  <div className="absolute top-2 left-2 z-10">
+                    <div className="bg-black/75 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                      {product.category === ProductCategory.VST_PLUGIN ? 'VST Plugin' : 'Sample Pack'}
+                    </div>
                   </div>
-                </div>
 
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px] z-20">
-                   <div className="p-2 bg-white text-black rounded-full shadow-lg">
-                      <Eye className="w-4 h-4" />
-                   </div>
-                </div>
-              </Link>
-
-              {/* Text Layout Matching 1000632389.jpg */}
-              <div className="pt-4 flex flex-col flex-grow">
-                <Link href={`/product/${product.id}`} className="hover:text-rose-500 transition-colors block mb-3">
-                  <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base line-clamp-1">
-                    {product.name}
-                  </h3>
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px] z-20">
+                     <div className="p-2 bg-white text-black rounded-full shadow-lg">
+                        <Eye className="w-4 h-4" />
+                     </div>
+                  </div>
                 </Link>
 
-                {/* Bottom Row: Price Left, Star Rating Right */}
-                <div className="mt-auto flex justify-between items-center text-sm font-bold">
-                   <span className="text-rose-600 dark:text-rose-500 tracking-wide font-mono">
-                      {product.price === 0 ? 'FREE' : `₦${product.price}`}
-                   </span>
-                   <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                     <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" /> 
-                     {product.rating || 5}
-                   </span>
+                <div className="pt-4 flex flex-col flex-grow">
+                  <Link href={productHref} className="hover:text-rose-500 transition-colors block mb-3">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base line-clamp-1">
+                      {product.name}
+                    </h3>
+                  </Link>
+
+                  <div className="mt-auto flex justify-between items-center text-sm font-bold">
+                     <span className="text-rose-600 dark:text-rose-500 tracking-wide font-mono">
+                        {product.price === 0 ? 'FREE' : `₦${product.price}`}
+                     </span>
+                     <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                       <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" /> 
+                       {product.rating || 5}
+                     </span>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))
+              </motion.div>
+            );
+          })
         ) : (
           <div className="col-span-full py-20 bg-white dark:bg-zinc-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-zinc-800 text-center">
              <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -362,8 +378,8 @@ const ShopContent: React.FC = () => {
                             : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'
                         }`}
                     >
-                        {idx + 1}
-                    </button>
+                        {idx + 1
+                    }</button>
                 ))}
             </div>
 
@@ -381,7 +397,6 @@ const ShopContent: React.FC = () => {
       <AnimatePresence>
         {alertConfig.show && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-            {/* Backdrop Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -390,14 +405,12 @@ const ShopContent: React.FC = () => {
               onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
             />
             
-            {/* Modal Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-sm flex flex-col items-center text-center gap-3 p-8 rounded-3xl shadow-2xl border bg-white dark:bg-zinc-900 border-gray-100 dark:border-zinc-800"
             >
-              {/* Close Button (Top Right) */}
               <button 
                 onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))} 
                 className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -405,7 +418,6 @@ const ShopContent: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Centered Icon */}
               <div className={`p-4 rounded-full mb-2 ${
                 alertConfig.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
                 alertConfig.type === 'error' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
@@ -416,7 +428,6 @@ const ShopContent: React.FC = () => {
                 {alertConfig.type === 'info' && <Info className="w-10 h-10" />}
               </div>
               
-              {/* Text Content */}
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 {alertConfig.type === 'success' ? 'Success!' : alertConfig.type === 'error' ? 'Oops!' : 'Notice'}
               </h3>
@@ -424,7 +435,6 @@ const ShopContent: React.FC = () => {
                 {alertConfig.message}
               </p>
               
-              {/* Action Button */}
               <button 
                 onClick={() => setAlertConfig(prev => ({ ...prev, show: false }))}
                 className={`w-full py-3 rounded-xl font-semibold transition-colors ${
@@ -444,10 +454,10 @@ const ShopContent: React.FC = () => {
   );
 };
 
-export default function Shop() {
+export default function Shop(props: ShopClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black"><Loader className="w-8 h-8 animate-spin text-rose-600" /></div>}>
-      <ShopContent />
+      <ShopContent {...props} />
     </Suspense>
   );
 }
