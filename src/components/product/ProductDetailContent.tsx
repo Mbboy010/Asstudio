@@ -50,7 +50,7 @@ export interface Review {
   isLiked?: boolean;
 }
 
-interface ShopClientProps {
+export interface ShopClientProps {
   initialSearch?: string;
   initialCategory?: string;
   initialPage?: number;

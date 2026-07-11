@@ -76,7 +76,6 @@ export default async function ShopPage({ searchParams }: Props) {
 
   return (
     <main>
-       {/* Passing down server-side extracted parameters directly */}
        <Shop 
          initialSearch={params.q || params.search || ''} 
          initialCategory={params.category || ''} 
