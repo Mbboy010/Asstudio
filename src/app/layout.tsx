@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: "Asstudio | Next-Gen Music Tools & Sound Packs",
     description: "Step into the future of sound. Download premium sample packs, VST presets, and elite production software.",
     url: "https://asstudio.com.ng",
-    siteName: "ASstudio",
+    siteName: "Asstudio",
     images: [
       {
         url: "/android-chrome-512x512.png", 
