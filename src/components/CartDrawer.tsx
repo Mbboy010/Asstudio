@@ -13,7 +13,8 @@ import {
   updateDoc, 
   getDocs, 
   writeBatch, 
-  increment
+  increment,
+  serverTimestamp // Imported for clean Firestore timestamps
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { onAuthStateChanged, sendEmailVerification, User as FirebaseUser } from 'firebase/auth';
@@ -163,7 +164,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         return;
       }
 
-      const timestamp = new Date().toISOString();
+      const timestampISO = new Date().toISOString();
       const generatedTxnId = `STU-${Math.floor(100000 + Math.random() * 900000)}`;
 
       // --- Deduct Balance and Update Total Spent ---
@@ -173,21 +174,36 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         totalSpent: increment(subtotal)
       });
 
-      // --- Log Checkout into user transaction history ---
-      const transactionRef = collection(db, "users", user.uid, "transactions");
-      await addDoc(transactionRef, {
+      // --- Log Checkout into root global transactions collection ---
+      // This allows your admin panel system-wide analytics ledger to track it instantly
+      const globalTransactionRef = collection(db, "transactions");
+      await addDoc(globalTransactionRef, {
+        userId: user.uid,
+        userName: user.displayName || 'Customer',
+        userEmail: user.email || '',
+        amount: subtotal,
+        type: 'debit', // Lowercase to match your admin metric aggregators
+        description: items.length === 1 ? `Purchased ${items[0].name}` : `Purchased ${items.length} studio items`,
+        status: 'completed', // Lowercase to match your completed check parameters
+        reference: generatedTxnId,
+        createdAt: serverTimestamp() // Uses Firestore field mapping natively
+      });
+
+      // --- Keep local user subcollection tracking intact for personal user logs ---
+      const userTransactionRef = collection(db, "users", user.uid, "transactions");
+      await addDoc(userTransactionRef, {
         type: 'Debit',
         description: items.length === 1 ? `Purchased ${items[0].name}` : `Purchased ${items.length} studio items`,
         amount: subtotal,
         reference: generatedTxnId,
         status: 'Successful',
-        createdAt: timestamp
+        createdAt: timestampISO
       });
 
       // Map to just id and savedAt
       const sortedItems = items.map(item => ({
         id: item.id,
-        savedAt: timestamp
+        savedAt: timestampISO
       }));
 
       // 1. Create Order
@@ -197,7 +213,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         items: sortedItems,
         total: subtotal,
         status: 'Completed',
-        createdAt: timestamp
+        createdAt: timestampISO
       });
 
       // 2. Clear Firestore Cart (Batch delete)
