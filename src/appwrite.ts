@@ -3,7 +3,7 @@ import { Client, Account, Databases, Storage, ID } from 'appwrite';
 const client = new Client();
 
 // Credentials extracted from your screenshots
-const endpoint = ' https://nyc.cloud.appwrite.io/v1';
+const endpoint = 'https://nyc.cloud.appwrite.io/v1';
 const projectId = '688cc8aa00395d9605a0';
 
 client
