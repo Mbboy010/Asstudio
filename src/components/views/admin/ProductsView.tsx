@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { 
   Plus, Edit2, Trash2, Image as ImageIcon, X, Save, 
   Loader, Music, CloudUpload, HardDrive, Calendar, Tag, Link as LinkIcon
@@ -74,8 +73,8 @@ const AdminProductsView: React.FC = () => {
       const q = query(collection(db, "products"), orderBy("uploadDate", "desc"));
       const querySnapshot = await getDocs(q);
       const fetchedProducts: Product[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedProducts.push({ id: doc.id, ...doc.data() } as Product);
+      querySnapshot.forEach((docSnapshot) => {
+        fetchedProducts.push({ id: docSnapshot.id, ...docSnapshot.data() } as Product);
       });
       setProducts(fetchedProducts);
     } catch (error) {
@@ -271,7 +270,7 @@ const AdminProductsView: React.FC = () => {
             <div key={product.id} className="group bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 overflow-hidden hover:shadow-xl transition-all">
               <div className="aspect-square relative overflow-hidden bg-gray-100 dark:bg-zinc-800">
                 {product.image && (
-                  <img src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={product.image} alt={product.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 )}
                 <div className="absolute top-3 right-3 flex gap-2">
                    <button onClick={() => handleEdit(product)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-rose-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
@@ -330,7 +329,7 @@ const AdminProductsView: React.FC = () => {
                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Cover Image</label>
                        <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800 group">
                           <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageInput} />
-                          {formData.image ? <img src={formData.image} alt="Preview" fill className="object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
+                          {formData.image ? <img src={formData.image} alt="Preview" className="absolute inset-0 w-full h-full object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
                        </div>
                     </div>
 
