@@ -448,12 +448,14 @@ const UserDashboardContent: React.FC = () => {
       }
   };
 
-  const handleDownloadItem = async (item: LibraryItem) => {
+const handleDownloadItem = async (item: LibraryItem) => {
     if (item.isDeleted) return;
 
     console.log("Full Library Item Object:", item);
 
-    const itemRecord = item as Record<string, unknown>;
+    // Cast via unknown first to satisfy TypeScript's strict rules
+    const itemRecord = item as unknown as Record<string, unknown>;
+    
     const fileKey = 
       (typeof itemRecord.productKey === 'string' ? itemRecord.productKey : undefined) || 
       (typeof itemRecord.fileKey === 'string' ? itemRecord.fileKey : undefined) || 
