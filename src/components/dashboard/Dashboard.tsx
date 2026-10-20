@@ -146,9 +146,9 @@ const UserDashboardContent: React.FC = () => {
     const q = query(transRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const transList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const transList = snapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data()
       })) as TransactionItem[];
       setTransactions(transList);
       setLoadingTransactions(false);
@@ -185,9 +185,9 @@ const UserDashboardContent: React.FC = () => {
 
     const unsubscribe = onSnapshot(favColRef, async (snapshot) => {
         // Collect IDs and potential creation dates to allow sorting by date
-        const favoriteList = snapshot.docs.map(doc => ({
-           id: doc.id,
-           addedAt: doc.data().createdAt || 0
+        const favoriteList = snapshot.docs.map(docSnapshot => ({
+           id: docSnapshot.id,
+           addedAt: docSnapshot.data().createdAt || 0
         }));
 
         if (favoriteList.length === 0) {
@@ -237,10 +237,10 @@ const UserDashboardContent: React.FC = () => {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         try {
-            const fetchedOrders = snapshot.docs.map(doc => {
-                const data = doc.data();
+            const fetchedOrders = snapshot.docs.map(docSnapshot => {
+                const data = docSnapshot.data();
                 return {
-                    id: doc.id,
+                    id: docSnapshot.id,
                     createdAt: data.createdAt,
                     status: data.status,
                     total: data.total,
@@ -448,15 +448,21 @@ const UserDashboardContent: React.FC = () => {
       }
   };
 
-const handleDownloadItem = async (item: LibraryItem) => {
+  const handleDownloadItem = async (item: LibraryItem) => {
     if (item.isDeleted) return;
 
-    // 1. Log the entire item object to your browser console (Press F12 -> Console to view it)
     console.log("Full Library Item Object:", item);
 
-    // 2. Check every possible property name where the key or URL might be stored
-    const fileKey = (item as any).productKey || (item as any).fileKey || (item as any).key;
-    const fileUrl = (item as any).productUrl || (item as any).url || (item as any).downloadUrl;
+    const itemRecord = item as Record<string, unknown>;
+    const fileKey = 
+      (typeof itemRecord.productKey === 'string' ? itemRecord.productKey : undefined) || 
+      (typeof itemRecord.fileKey === 'string' ? itemRecord.fileKey : undefined) || 
+      (typeof itemRecord.key === 'string' ? itemRecord.key : undefined);
+
+    const fileUrl = 
+      (typeof itemRecord.productUrl === 'string' ? itemRecord.productUrl : undefined) || 
+      (typeof itemRecord.url === 'string' ? itemRecord.url : undefined) || 
+      (typeof itemRecord.downloadUrl === 'string' ? itemRecord.downloadUrl : undefined);
 
     if (fileKey) {
         try {
@@ -487,7 +493,6 @@ const handleDownloadItem = async (item: LibraryItem) => {
         window.open(fileUrl, '_blank');
     } 
     else {
-        // If this pops up, open your browser Console (F12) to see what fields `item` actually has!
         alert(`Product "${item.name}" has no file key or URL attached in Firestore. Check your browser console (F12) to see the item data.`);
     }
   };
