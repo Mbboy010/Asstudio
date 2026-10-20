@@ -4,14 +4,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { 
   Plus, Edit2, Trash2, Image as ImageIcon, X, Save, 
-  Loader, Music, CloudUpload, HardDrive, Calendar, Tag, Link as LinkIcon, FileText
+  Loader, Music, CloudUpload, HardDrive, Calendar, Tag, Link as LinkIcon
 } from 'lucide-react';
 import { ProductCategory, Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import DescriptionEditor from './DescriptionEditor'; 
 import { collection, updateDoc, deleteDoc, doc, getDocs, query, orderBy, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { storage, BUCKET_ID, ID } from '@/appwrite'; 
 import { v4 as uuidv4 } from 'uuid';
 
 const CROP_SIZE = 400;
@@ -32,6 +31,7 @@ const AdminProductsView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   
   // Toggle states for File vs Link
   const [productSource, setProductSource] = useState<'file' | 'link'>('file');
@@ -87,6 +87,41 @@ const AdminProductsView: React.FC = () => {
 
   useEffect(() => { fetchProducts(); }, []);
 
+  // --- HELPER: Upload with Progress Tracking to RumptyCloud ---
+  const uploadToRumptyWithProgress = async (file: File, isPaid: boolean, label: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formDataObj = new FormData();
+      formDataObj.append("file", file);
+      formDataObj.append("isPaid", String(isPaid));
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded * 100) / event.total);
+          setUploadProgress(prev => ({ ...prev, [label]: percentComplete }));
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.fileUrl || "");
+          } catch (e) {
+            reject(new Error("Invalid JSON response"));
+          }
+        } else {
+          reject(new Error("Upload failed"));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+
+      xhr.open("POST", "/api/upload");
+      xhr.send(formDataObj);
+    });
+  };
+
   const handleEdit = (product: Product) => {
     setEditingId(product.id);
     setFormData({
@@ -102,7 +137,6 @@ const AdminProductsView: React.FC = () => {
       demoUrl: product.demoUrl || '',
       rating: product.rating?.toString() || '5.0'
     });
-    // Set sources based on whether they look like URLs or are empty
     setProductSource(product.productUrl ? 'link' : 'file');
     setAudioSource(product.demoUrl ? 'link' : 'file');
     setProductFile(null);
@@ -125,37 +159,27 @@ const AdminProductsView: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const uploadToAppwrite = async (file: File): Promise<string> => {
-    try {
-      const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
-      return storage.getFileView(BUCKET_ID, response.$id).toString();
-    } catch (error) {
-      console.error("Appwrite Upload Error", error);
-      throw error;
-    }
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setUploadProgress({});
     try {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
       let finalImageUrl = formData.image;
+      const isPaidProduct = Number(formData.price) > 0;
 
-      // Product Logic: Upload if in 'file' mode and file exists, otherwise use link
       if (productSource === 'file' && productFile) {
-        finalProductUrl = await uploadToAppwrite(productFile);
+        finalProductUrl = await uploadToRumptyWithProgress(productFile, isPaidProduct, productFile.name);
       }
 
-      // Audio Logic: Upload if in 'file' mode and file exists, otherwise use link
       if (audioSource === 'file' && audioFile) {
-        finalDemoUrl = await uploadToAppwrite(audioFile);
+        finalDemoUrl = await uploadToRumptyWithProgress(audioFile, false, audioFile.name);
       }
       
       if (formData.image.startsWith('data:image')) {
         const imageFile = dataURLtoFile(formData.image, `edit-${uuidv4()}.jpg`);
-        finalImageUrl = await uploadToAppwrite(imageFile);
+        finalImageUrl = await uploadToRumptyWithProgress(imageFile, false, "Cover Art");
       }
 
       const submissionData = {
@@ -170,6 +194,7 @@ const AdminProductsView: React.FC = () => {
         productUrl: finalProductUrl,
         demoUrl: finalDemoUrl,
         rating: Number(formData.rating),
+        isPaid: isPaidProduct,
       };
 
       if (editingId) {
@@ -183,7 +208,11 @@ const AdminProductsView: React.FC = () => {
       setIsModalOpen(false);
     } catch (error) {
       console.error(error);
-    } finally { setIsSaving(false); }
+      alert("Failed to save product.");
+    } finally { 
+      setIsSaving(false); 
+      setUploadProgress({});
+    }
   };
 
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,7 +271,7 @@ const AdminProductsView: React.FC = () => {
             <div key={product.id} className="group bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 overflow-hidden hover:shadow-xl transition-all">
               <div className="aspect-square relative overflow-hidden bg-gray-100 dark:bg-zinc-800">
                 {product.image && (
-                  <Image src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={product.image} alt={product.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                 )}
                 <div className="absolute top-3 right-3 flex gap-2">
                    <button onClick={() => handleEdit(product)} className="p-2 bg-white/90 dark:bg-zinc-900/90 rounded-full shadow-lg hover:text-rose-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
@@ -273,7 +302,27 @@ const AdminProductsView: React.FC = () => {
                  <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800"><X className="w-6 h-6" /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Upload Progress Indicator */}
+                {isSaving && Object.keys(uploadProgress).length > 0 && (
+                  <div className="bg-gray-50 dark:bg-zinc-800/80 p-4 rounded-2xl border border-rose-500/30 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-rose-600">
+                      <Loader className="w-4 h-4 animate-spin" /> Uploading files to RumptyCloud...
+                    </div>
+                    {Object.entries(uploadProgress).map(([fileName, progress]) => (
+                      <div key={fileName} className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                          <span className="truncate">{fileName}</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-rose-600 transition-all duration-200" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
                   {/* Media Column */}
                   <div className="md:col-span-4 space-y-6">
@@ -281,7 +330,7 @@ const AdminProductsView: React.FC = () => {
                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Cover Image</label>
                        <div onClick={() => imageInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 dark:border-zinc-700 flex items-center justify-center cursor-pointer hover:border-rose-500 overflow-hidden relative bg-gray-50 dark:bg-zinc-800 group">
                           <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageInput} />
-                          {formData.image ? <Image src={formData.image} alt="Preview" fill className="object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
+                          {formData.image ? <img src={formData.image} alt="Preview" fill className="object-cover" /> : <ImageIcon className="w-10 h-10 text-gray-300" />}
                        </div>
                     </div>
 
@@ -290,8 +339,8 @@ const AdminProductsView: React.FC = () => {
                        <div className="flex justify-between items-center">
                           <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Product Source</label>
                           <div className="flex bg-gray-200 dark:bg-zinc-700 p-1 rounded-lg">
-                             <button onClick={() => setProductSource('file')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${productSource === 'file' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>File</button>
-                             <button onClick={() => setProductSource('link')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${productSource === 'link' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>Link</button>
+                             <button type="button" onClick={() => setProductSource('file')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${productSource === 'file' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>File</button>
+                             <button type="button" onClick={() => setProductSource('link')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${productSource === 'link' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>Link</button>
                           </div>
                        </div>
                        
@@ -299,12 +348,12 @@ const AdminProductsView: React.FC = () => {
                           <div onClick={() => productFileInputRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-4 flex flex-col items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-900/10 cursor-pointer">
                              <input type="file" ref={productFileInputRef} className="hidden" onChange={(e) => setProductFile(e.target.files?.[0] || null)} />
                              <CloudUpload className="w-6 h-6 text-rose-500 mb-1" />
-                             <span className="text-[10px] font-bold text-center truncate w-full">{productFile ? productFile.name : 'Upload ZIP'}</span>
+                             <span className="text-[10px] font-bold text-center truncate w-full">{productFile ? productFile.name : 'Upload File'}</span>
                           </div>
                        ) : (
                           <div className="relative">
                              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                             <input value={formData.productUrl} onChange={e => setFormData({...formData, productUrl: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl pl-9 pr-4 py-3 text-xs outline-none" placeholder="Paste Link (Drive, Dropbox...)" />
+                             <input value={formData.productUrl} onChange={e => setFormData({...formData, productUrl: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl pl-9 pr-4 py-3 text-xs outline-none" placeholder="Paste Direct URL..." />
                           </div>
                        )}
 
@@ -313,14 +362,15 @@ const AdminProductsView: React.FC = () => {
                        <div className="flex justify-between items-center">
                           <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Audio Demo</label>
                           <div className="flex bg-gray-200 dark:bg-zinc-700 p-1 rounded-lg">
-                             <button onClick={() => setAudioSource('file')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${audioSource === 'file' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>File</button>
-                             <button onClick={() => setAudioSource('link')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${audioSource === 'link' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>Link</button>
+                             <button type="button" onClick={() => setAudioSource('file')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${audioSource === 'file' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>File</button>
+                             <button type="button" onClick={() => setAudioSource('link')} className={`px-2 py-1 text-[10px] rounded-md transition-all ${audioSource === 'link' ? 'bg-white dark:bg-zinc-900 shadow-sm' : 'text-gray-500'}`}>Link</button>
                           </div>
                        </div>
 
                        {audioSource === 'file' ? (
                           <div className="space-y-2">
                              <input type="file" accept="audio/*" className="w-full text-[10px] file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-rose-600 file:text-white" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
+                             {audioFile && <p className="text-[10px] text-green-500 truncate">{audioFile.name}</p>}
                           </div>
                        ) : (
                           <div className="relative">
@@ -386,7 +436,7 @@ const AdminProductsView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* CROP MODAL (KEEP AS IS) */}
+      {/* CROP MODAL */}
       <AnimatePresence>
         {isCropOpen && cropImgSrc && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90">

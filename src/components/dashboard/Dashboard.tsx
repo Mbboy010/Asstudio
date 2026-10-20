@@ -448,19 +448,47 @@ const UserDashboardContent: React.FC = () => {
       }
   };
 
-  const handleDownloadItem = (item: LibraryItem) => {
+const handleDownloadItem = async (item: LibraryItem) => {
     if (item.isDeleted) return;
-    if (item.productUrl) {
-        window.open(item.productUrl, '_blank');
-    } else {
-        const element = document.createElement("a");
-        const fileContent = `Product: ${item.name}\nDownload ID: ${item.id}`;
-        const file = new Blob([fileContent], {type: 'text/plain'});
-        element.href = URL.createObjectURL(file);
-        element.download = `${(item.name || 'product').replace(/\s+/g, '_')}_License.txt`;
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
+
+    // 1. Log the entire item object to your browser console (Press F12 -> Console to view it)
+    console.log("Full Library Item Object:", item);
+
+    // 2. Check every possible property name where the key or URL might be stored
+    const fileKey = (item as any).productKey || (item as any).fileKey || (item as any).key;
+    const fileUrl = (item as any).productUrl || (item as any).url || (item as any).downloadUrl;
+
+    if (fileKey) {
+        try {
+            const response = await fetch('/api/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileKey }),
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.downloadUrl) {
+                const element = document.createElement("a");
+                element.href = data.downloadUrl;
+                element.setAttribute('download', item.name || 'product');
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            } else {
+                alert("Failed to generate secure download link: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Download error:", error);
+            alert("An error occurred while downloading.");
+        }
+    } 
+    else if (fileUrl) {
+        window.open(fileUrl, '_blank');
+    } 
+    else {
+        // If this pops up, open your browser Console (F12) to see what fields `item` actually has!
+        alert(`Product "${item.name}" has no file key or URL attached in Firestore. Check your browser console (F12) to see the item data.`);
     }
   };
 

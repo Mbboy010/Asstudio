@@ -9,16 +9,10 @@ import DescriptionEditor from './DescriptionEditor';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { v4 as uuidv4 } from 'uuid';
-
-// --- APPWRITE IMPORTS ---
-import { storage, BUCKET_ID, ID } from '@/appwrite'; 
+import { UploadProgress } from './UploadProgress'; // Import progress component
 
 const CROP_SIZE = 400;
 
-/**
- * HELPER: Converts a Base64/DataURL string into a File object 
- * so it can be uploaded like a normal image.
- */
 const dataURLtoFile = (dataurl: string, filename: string): File => {
   const arr = dataurl.split(',');
   const mimeMatch = arr[0].match(/:(.*?);/);
@@ -34,6 +28,8 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 const AdminUploadView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [currentUploadingFile, setCurrentUploadingFile] = useState<string>('');
 
   // Product File State
   const [productType, setProductType] = useState<'file' | 'link'>('file');
@@ -85,16 +81,41 @@ const AdminUploadView: React.FC = () => {
   const productInputRef = useRef<HTMLInputElement>(null);
   const demoInputRef = useRef<HTMLInputElement>(null);
 
-  // --- HELPER: Upload to Appwrite ---
-  const uploadToAppwrite = async (file: File): Promise<string> => {
-    try {
-        const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), file);
-        // Get the public preview/view URL
-        return storage.getFileView(BUCKET_ID, uploaded.$id).toString(); 
-    } catch (error) {
-        console.error("Appwrite Upload Error:", error);
-        throw error;
-    }
+  // --- HELPER: Upload with Progress Tracking ---
+  const uploadToRumptyWithProgress = async (file: File, isPaid: boolean, label: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formDataObj = new FormData();
+      formDataObj.append("file", file);
+      formDataObj.append("isPaid", String(isPaid));
+
+      setCurrentUploadingFile(label);
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded * 100) / event.total);
+          setUploadProgress(prev => ({ ...prev, [label]: percentComplete }));
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.fileUrl || "");
+          } catch (e) {
+            reject(new Error("Invalid JSON response"));
+          }
+        } else {
+          reject(new Error("Upload failed"));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+
+      xhr.open("POST", "/api/upload");
+      xhr.send(formDataObj);
+    });
   };
 
   const handleProductDrag = (e: React.DragEvent) => {
@@ -256,7 +277,6 @@ const AdminUploadView: React.FC = () => {
         let quality = 0.9;
         let dataUrl = await compressImage(canvas, quality);
 
-        // Compress until it's under a reasonable size for Base64 preview
         while (dataUrl.length > 68000 && quality > 0.1) {
             quality -= 0.1;
             dataUrl = await compressImage(canvas, quality);
@@ -281,30 +301,33 @@ const AdminUploadView: React.FC = () => {
     }
 
     setIsUploading(true);
+    setUploadProgress({});
+
     try {
       let finalProductUrl = productUrl;
       let finalDemoUrl = demoUrl;
-      let finalCoverUrl = ""; // This will hold the Appwrite URL
+      let finalCoverUrl = ""; 
+      const isPaidProduct = Number(formData.price) > 0;
 
-      // 1. Upload Product File
+      // 1. Upload Product File with Progress
       if (productType === 'file' && productFile) {
-        finalProductUrl = await uploadToAppwrite(productFile);
+        finalProductUrl = await uploadToRumptyWithProgress(productFile, isPaidProduct, productFile.name);
       }
 
-      // 2. Upload Demo Track
+      // 2. Upload Demo Track with Progress
       if (demoType === 'file' && demoFile) {
-        finalDemoUrl = await uploadToAppwrite(demoFile);
+        finalDemoUrl = await uploadToRumptyWithProgress(demoFile, false, demoFile.name);
       }
 
-      // 3. Upload Screenshots
+      // 3. Upload Screenshots with Progress
       const screenshotUrls = await Promise.all(
-        screenshotFiles.map(file => uploadToAppwrite(file))
+        screenshotFiles.map(file => uploadToRumptyWithProgress(file, false, file.name))
       );
       
-      // 4. CONVERT BASE64 COVER TO FILE & UPLOAD TO APPWRITE
+      // 4. Upload Cover Art with Progress
       if (coverPreview && coverPreview.startsWith('data:image')) {
         const coverFile = dataURLtoFile(coverPreview, `cover-${iduu}.jpg`);
-        finalCoverUrl = await uploadToAppwrite(coverFile);
+        finalCoverUrl = await uploadToRumptyWithProgress(coverFile, false, "Cover Art");
       }
       
       function replaceWhiteWithDash(str: string): string {
@@ -313,7 +336,7 @@ const AdminUploadView: React.FC = () => {
                 
       const dataId = `${replaceWhiteWithDash(formData.name)}-${iduu}`;
       
-      // 5. Save to Firestore (with Appwrite URL instead of Base64)
+      // 5. Save to Firestore
       await setDoc(doc(collection(db, "products"), dataId), {
         name: formData.name,
         category: formData.category,
@@ -327,11 +350,12 @@ const AdminUploadView: React.FC = () => {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
-        image: finalCoverUrl, // Now a standard Appwrite URL
+        image: finalCoverUrl, 
         screenshots: screenshotUrls,
         downloadType: productType,
         productUrl: finalProductUrl || null,
         demoUrl: finalDemoUrl || null,
+        isPaid: isPaidProduct,
       });
 
       alert("Product successfully published!");
@@ -341,6 +365,7 @@ const AdminUploadView: React.FC = () => {
       setDemoFile(null); setDemoUrl('');
       setScreenshotFiles([]); setScreenshotPreviews([]);
       setCoverPreview(null);
+      setUploadProgress({});
       setFormData({
         name: '', category: ProductCategory.SAMPLE_PACK, price: '',
         description: '', tags: '', size: '', rating: '5.0',
@@ -352,6 +377,7 @@ const AdminUploadView: React.FC = () => {
       alert("Failed to upload. Please check your connection.");
     } finally {
       setIsUploading(false);
+      setCurrentUploadingFile('');
     }
   };
 
@@ -373,6 +399,18 @@ const AdminUploadView: React.FC = () => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
             <div className="lg:col-span-2 space-y-6">
+
+            {/* Active Upload Progress Bars Display */}
+            {isUploading && Object.keys(uploadProgress).length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-rose-500/30 p-6 shadow-md space-y-3">
+                <h4 className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                  <Loader className="w-4 h-4 animate-spin text-rose-600" /> Uploading to RumptyCloud...
+                </h4>
+                {Object.entries(uploadProgress).map(([fileName, progress]) => (
+                  <UploadProgress key={fileName} fileName={fileName} progress={progress} />
+                ))}
+              </div>
+            )}
 
             <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-8 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
@@ -716,7 +754,7 @@ const AdminUploadView: React.FC = () => {
             >
                 {isUploading ? (
                     <>
-                    <Loader className="w-5 h-5 animate-spin" /> Uploading...
+                    <Loader className="w-5 h-5 animate-spin" /> Uploading Files...
                     </>
                 ) : (
                     <>
