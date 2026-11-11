@@ -38,6 +38,10 @@ const AdminProductsView: React.FC = () => {
 
   const [productFile, setProductFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  
+  // New state for multiple screenshots
+  const [newScreenshotFiles, setNewScreenshotFiles] = useState<File[]>([]);
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -51,7 +55,8 @@ const AdminProductsView: React.FC = () => {
     tagsInput: '', 
     productUrl: '',
     demoUrl: '',
-    rating: '5.0'
+    rating: '5.0',
+    screenshots: [] as string[] // Stores URLs of existing/uploaded screenshots
   });
 
   const [isCropOpen, setIsCropOpen] = useState(false);
@@ -66,6 +71,7 @@ const AdminProductsView: React.FC = () => {
   const cropImgRef = useRef<HTMLImageElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -134,12 +140,14 @@ const AdminProductsView: React.FC = () => {
       tagsInput: product.features ? product.features.join(', ') : '',
       productUrl: product.productUrl || '',
       demoUrl: product.demoUrl || '',
-      rating: product.rating?.toString() || '5.0'
+      rating: product.rating?.toString() || '5.0',
+      screenshots: (product as any).screenshots || []
     });
     setProductSource(product.productUrl ? 'link' : 'file');
     setAudioSource(product.demoUrl ? 'link' : 'file');
     setProductFile(null);
     setAudioFile(null);
+    setNewScreenshotFiles([]);
     setIsModalOpen(true);
   };
 
@@ -149,13 +157,34 @@ const AdminProductsView: React.FC = () => {
       name: '', category: ProductCategory.SAMPLE_PACK, price: '',
       description: '', image: '', size: '', 
       uploadDate: new Date().toISOString().split('T')[0],
-      tagsInput: '', productUrl: '', demoUrl: '', rating: '5.0'
+      tagsInput: '', productUrl: '', demoUrl: '', rating: '5.0',
+      screenshots: []
     });
     setProductSource('file');
     setAudioSource('file');
     setProductFile(null);
     setAudioFile(null);
+    setNewScreenshotFiles([]);
     setIsModalOpen(true);
+  };
+
+  // --- SCREENSHOT HANDLERS ---
+  const handleScreenshotInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setNewScreenshotFiles(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeExistingScreenshot = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      screenshots: prev.screenshots.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  const removeNewScreenshot = (indexToRemove: number) => {
+    setNewScreenshotFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -166,6 +195,7 @@ const AdminProductsView: React.FC = () => {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
       let finalImageUrl = formData.image;
+      let finalScreenshots = [...formData.screenshots];
       const isPaidProduct = Number(formData.price) > 0;
 
       if (productSource === 'file' && productFile) {
@@ -181,6 +211,14 @@ const AdminProductsView: React.FC = () => {
         finalImageUrl = await uploadToRumptyWithProgress(imageFile, false, "Cover Art");
       }
 
+      // Upload new screenshots
+      if (newScreenshotFiles.length > 0) {
+        for (const file of newScreenshotFiles) {
+          const uploadedUrl = await uploadToRumptyWithProgress(file, false, `Screenshot: ${file.name}`);
+          finalScreenshots.push(uploadedUrl);
+        }
+      }
+
       const submissionData = {
         name: formData.name,
         category: formData.category,
@@ -193,6 +231,7 @@ const AdminProductsView: React.FC = () => {
         productUrl: finalProductUrl,
         demoUrl: finalDemoUrl,
         rating: Number(formData.rating),
+        screenshots: finalScreenshots,
         isPaid: isPaidProduct,
       };
 
@@ -421,11 +460,49 @@ const AdminProductsView: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* SCREENSHOTS SECTION (Full Width) */}
+                <div className="pt-6 border-t border-gray-200 dark:border-zinc-800 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-bold">Screenshots</label>
+                    <span className="text-xs text-gray-500 font-medium">{formData.screenshots.length + newScreenshotFiles.length} Images</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                    {/* Existing Screenshots */}
+                    {formData.screenshots.map((url, i) => (
+                      <div key={`exist-${i}`} className="relative aspect-video bg-gray-100 dark:bg-zinc-800 rounded-xl overflow-hidden group border border-gray-200 dark:border-zinc-700">
+                        <img src={url} alt={`Screenshot ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                        <button type="button" onClick={() => removeExistingScreenshot(i)} className="absolute z-10 top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {/* New Screenshot Previews */}
+                    {newScreenshotFiles.map((file, i) => (
+                      <div key={`new-${i}`} className="relative aspect-video bg-gray-100 dark:bg-zinc-800 rounded-xl overflow-hidden group border border-rose-200 dark:border-rose-900">
+                        <img src={URL.createObjectURL(file)} alt={`New Screenshot ${i + 1}`} className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                        <div className="absolute z-10 inset-0 border-2 border-rose-500 rounded-xl pointer-events-none"></div>
+                        <button type="button" onClick={() => removeNewScreenshot(i)} className="absolute z-20 top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {/* Add Screenshot Button */}
+                    <div onClick={() => screenshotInputRef.current?.click()} className="relative aspect-video bg-gray-50 dark:bg-zinc-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-700 flex flex-col items-center justify-center cursor-pointer hover:border-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-colors">
+                      <input type="file" ref={screenshotInputRef} multiple accept="image/*" className="hidden" onChange={handleScreenshotInput} />
+                      <Plus className="w-6 h-6 text-gray-400" />
+                      <span className="text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Add Images</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="p-6 border-t border-gray-200 dark:border-zinc-800 flex gap-4">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500">Cancel</button>
-                 <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-4 bg-rose-600 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-xl transition-colors">Cancel</button>
+                 <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-4 bg-rose-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-rose-700 transition-colors disabled:opacity-70">
                    {isSaving ? <Loader className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5" />} 
                    {editingId ? 'Update Product' : 'Create Product'}
                  </button>
@@ -458,8 +535,8 @@ const AdminProductsView: React.FC = () => {
                     </div>
                     <input type="range" min="1" max="3" step="0.1" value={cropZoom} onChange={(e) => setCropZoom(parseFloat(e.target.value))} className="w-full accent-rose-600 mb-6" />
                     <div className="flex gap-3">
-                        <button onClick={() => setIsCropOpen(false)} className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold">Cancel</button>
-                        <button onClick={handleSaveCrop} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold">Apply</button>
+                        <button onClick={() => setIsCropOpen(false)} className="flex-1 py-3 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-zinc-800">Cancel</button>
+                        <button onClick={handleSaveCrop} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700">Apply</button>
                     </div>
                 </div>
             </div>
