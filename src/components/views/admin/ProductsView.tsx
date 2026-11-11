@@ -141,7 +141,7 @@ const AdminProductsView: React.FC = () => {
       productUrl: product.productUrl || '',
       demoUrl: product.demoUrl || '',
       rating: product.rating?.toString() || '5.0',
-      screenshots: (product as any).screenshots || []
+      screenshots: (product as Product & { screenshots?: string[] }).screenshots || []
     });
     setProductSource(product.productUrl ? 'link' : 'file');
     setAudioSource(product.demoUrl ? 'link' : 'file');
@@ -195,7 +195,7 @@ const AdminProductsView: React.FC = () => {
       let finalProductUrl = formData.productUrl;
       let finalDemoUrl = formData.demoUrl;
       let finalImageUrl = formData.image;
-      let finalScreenshots = [...formData.screenshots];
+      const finalScreenshots = [...formData.screenshots];
       const isPaidProduct = Number(formData.price) > 0;
 
       if (productSource === 'file' && productFile) {
